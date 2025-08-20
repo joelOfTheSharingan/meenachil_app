@@ -1,0 +1,112 @@
+[
+  {
+    "table_name": "construction_sites",
+    "column_name": "id",
+    "data_type": "bigint"
+  },
+  {
+    "table_name": "construction_sites",
+    "column_name": "site_name",
+    "data_type": "text"
+  },
+  {
+    "table_name": "construction_sites",
+    "column_name": "contractor",
+    "data_type": "text"
+  },
+  {
+    "table_name": "equipment",
+    "column_name": "id",
+    "data_type": "bigint"
+  },
+  {
+    "table_name": "equipment",
+    "column_name": "name",
+    "data_type": "text"
+  },
+  {
+    "table_name": "equipment",
+    "column_name": "status",
+    "data_type": "text"
+  },
+  {
+    "table_name": "equipment",
+    "column_name": "site_id",
+    "data_type": "bigint"
+  },
+  {
+    "table_name": "equipment_transfers",
+    "column_name": "id",
+    "data_type": "bigint"
+  },
+  {
+    "table_name": "equipment_transfers",
+    "column_name": "equipment_id",
+    "data_type": "bigint"
+  },
+  {
+    "table_name": "equipment_transfers",
+    "column_name": "from_site_id",
+    "data_type": "bigint"
+  },
+  {
+    "table_name": "equipment_transfers",
+    "column_name": "to_site_id",
+    "data_type": "bigint"
+  },
+  {
+    "table_name": "equipment_transfers",
+    "column_name": "requested_at",
+    "data_type": "timestamp with time zone"
+  },
+  {
+    "table_name": "equipment_transfers",
+    "column_name": "approved_at",
+    "data_type": "timestamp with time zone"
+  },
+  {
+    "table_name": "equipment_transfers",
+    "column_name": "status",
+    "data_type": "text"
+  },
+  {
+    "table_name": "equipment_transfers",
+    "column_name": "transfer_by_user_id",
+    "data_type": "uuid"
+  },
+  {
+    "table_name": "users",
+    "column_name": "id",
+    "data_type": "uuid"
+  },
+  {
+    "table_name": "users",
+    "column_name": "auth_id",
+    "data_type": "uuid"
+  },
+  {
+    "table_name": "users",
+    "column_name": "email",
+    "data_type": "text"
+  },
+  {
+    "table_name": "users",
+    "column_name": "name",
+    "data_type": "text"
+  },
+  {
+    "table_name": "users",
+    "column_name": "role",
+    "data_type": "text"
+  },
+  {
+    "table_name": "users",
+    "column_name": "new_id",
+    "data_type": "uuid"
+  },
+  {
+    "table_name": "users",
+    "column_name": "site_id",
+    "data_type": "uuid"
+  }
+]
