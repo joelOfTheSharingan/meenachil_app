@@ -58,7 +58,7 @@ const AppRoutes: React.FC = () => {
 
 function App() {
   return (
-    <Router>
+    <Router  basename="/meenachil_app">
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>
