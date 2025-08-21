@@ -4,9 +4,13 @@
     <meta charset="utf-8">
     <title>Redirecting...</title>
     <script type="text/javascript">
-      // Redirect all paths back to index.html
-      var redirectTo = window.location.protocol + '//' + window.location.host + '/meenachil_app/';
-      window.location.replace(redirectTo);
+      // Store the current path
+      var redirectPath = window.location.pathname.replace('/meenachil_app', '');
+      
+      // Redirect to index.html while keeping the path as query param
+      window.location.replace(
+        window.location.protocol + '//' + window.location.host + '/meenachil_app/?redirect=' + redirectPath
+      );
     </script>
   </head>
   <body></body>
