@@ -30,35 +30,48 @@ const AppRoutes: React.FC = () => {
       <Route path="/signup" element={user ? <Navigate to="/home" replace /> : <SignUpPage />} />
 
       {/* Protected routes */}
-      <Route path="/home" element={
-        <ProtectedRoute>
-          <HomePage />
-        </ProtectedRoute>
-      } />
-      <Route path="/admin" element={
-        <ProtectedRoute allowedRoles={['admin']}>
-          <AdminDashboard />
-        </ProtectedRoute>
-      } />
-      <Route path="/supervisor" element={
-        <ProtectedRoute allowedRoles={['supervisor']}>
-          <SupervisorDashboard />
-        </ProtectedRoute>
-      } />
+      <Route
+        path="/home"
+        element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/supervisor"
+        element={
+          <ProtectedRoute allowedRoles={['supervisor']}>
+            <SupervisorDashboard />
+          </ProtectedRoute>
+        }
+      />
 
       {/* ✅ New My Site Tools route */}
-      <Route path="/my-site-tools" element={
-        <ProtectedRoute allowedRoles={['supervisor']}>
-          <MySiteTools />
-        </ProtectedRoute>
-      } />
+      <Route
+        path="/my-site-tools"
+        element={
+          <ProtectedRoute allowedRoles={['supervisor']}>
+            <MySiteTools />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   )
 }
 
 function App() {
   return (
-    <Router  basename="/meenachil_app">
+    // ✅ Add basename to fix GitHub Pages subdirectory issue
+    <Router basename="/meenachil_app">
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>
