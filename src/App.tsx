@@ -64,6 +64,9 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* Fallback for unmatched paths */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
