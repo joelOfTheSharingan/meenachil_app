@@ -95,7 +95,7 @@ const SignUpPage: React.FC = () => {
         <button
               type="button"
               onClick={() => navigate('/login')}
-              className="text-blue-600 hover:text-blue-500"
+              className="text-blue-600 hover:text-blue-500 text-align-center w-full mt-4"
             >
               Already have an account? Login
             </button>
