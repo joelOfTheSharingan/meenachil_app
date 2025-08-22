@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext.tsx'
 import { ProtectedRoute } from './components/ProtectedRoute.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
@@ -56,25 +56,18 @@ const AppRoutes: React.FC = () => {
       />
 
       {/* ✅ New My Site Tools route */}
-      <Route
-        path="/my-site-tools"
-        element={
-          <ProtectedRoute allowedRoles={['supervisor']}>
-            <MySiteTools />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Fallback for unmatched paths */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/my-site-tools" element={
+        <ProtectedRoute allowedRoles={['supervisor']}>
+          <MySiteTools />
+        </ProtectedRoute>
+      } />
     </Routes>
   )
 }
 
 function App() {
   return (
-    // ✅ Add basename to fix GitHub Pages subdirectory issue
-    <Router basename="/meenachil_app">
+    <Router>
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>
