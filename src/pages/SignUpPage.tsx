@@ -93,17 +93,16 @@ const SignUpPage: React.FC = () => {
         </div>
 
         <p className="mt-4 text-sm text-center text-gray-600">
-  Already have an account?{' '}
-  <a
-    href="https://joelofthesharingan.github.io/meenachil_app/#/login"
-    className="text-blue-600 hover:underline"
-  >
-    Login
-  </a>
-</p>
+          Already have an account?{' '}
+          <Link to="#/login" className="text-blue-600 hover:underline">
+            Login
+          </Link>
+        </p>
       </div>
     </div>
   )
 }
 
 export default SignUpPage
+
+
