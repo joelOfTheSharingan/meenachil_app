@@ -92,13 +92,13 @@ const SignUpPage: React.FC = () => {
             Sign up with Google
           </button>
         </div>
-
-        <p className="mt-4 text-sm text-center text-gray-600">
-          Already have an account?{' '}
-          <Link to="/login" className="text-blue-600 hover:underline">
-            Login
-          </Link>
-        </p>
+        <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="text-blue-600 hover:text-blue-500"
+            >
+              Already have an account? Login
+            </button>
       </div>
     </div>
   )
