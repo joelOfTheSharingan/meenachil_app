@@ -56,17 +56,21 @@ const AppRoutes: React.FC = () => {
       />
 
       {/* ✅ New My Site Tools route */}
-      <Route path="/my-site-tools" element={
-        <ProtectedRoute allowedRoles={['supervisor']}>
-          <MySiteTools />
-        </ProtectedRoute>
-      } />
+      <Route
+        path="/my-site-tools"
+        element={
+          <ProtectedRoute allowedRoles={['supervisor']}>
+            <MySiteTools />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   )
 }
 
 function App() {
   return (
+    // ✅ Use HashRouter for GitHub Pages routing
     <Router>
       <AuthProvider>
         <AppRoutes />
