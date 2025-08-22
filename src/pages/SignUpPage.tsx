@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
 import React, { useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 
 const SignUpPage: React.FC = () => {
@@ -10,6 +10,7 @@ const SignUpPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
 
   const { signUp, signInWithGoogle } = useAuth()
+  const navigate = useNavigate()
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,15 +23,14 @@ const SignUpPage: React.FC = () => {
     if (error) {
       setError(error.message)
     } else {
-      // Redirect after signup (external URL)
-      window.location.href = 'https://joelofthesharingan.github.io/meenachil_app/#/home'
+      navigate('/home') // SPA navigation instead of full reload
     }
   }
 
   const handleGoogleSignUp = async () => {
     try {
       await signInWithGoogle()
-      window.location.href = 'https://joelofthesharingan.github.io/meenachil_app/#/home'
+      navigate('/home')
     } catch (err: any) {
       setError(err.message || 'Google sign-in failed')
     }
@@ -95,9 +95,9 @@ const SignUpPage: React.FC = () => {
 
         <p className="mt-4 text-sm text-center text-gray-600">
           Already have an account?{' '}
-          <Link to="/meenachil_app/#/login" className="text-blue-600 hover:underline">
-    Login
-  </Link>
+          <Link to="/login" className="text-blue-600 hover:underline">
+            Login
+          </Link>
         </p>
       </div>
     </div>
