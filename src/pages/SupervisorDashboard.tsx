@@ -35,7 +35,6 @@ const Dashboard = () => {
   fetchUserAndEquipment();
 }, []);
 
-
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
