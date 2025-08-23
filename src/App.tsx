@@ -7,18 +7,19 @@ import SignUpPage from './pages/SignUpPage.tsx'
 import HomePage from './pages/HomePage.tsx'
 import AdminDashboard from './pages/AdminDashboard.tsx'
 import SupervisorDashboard from './pages/SupervisorDashboard.tsx'
-import MySiteTools from './pages/MySiteTools.tsx' // ✅ New page
+import MySiteTools from './pages/MySiteTools.tsx'
+
+// ✅ Loader component to keep AppRoutes clean
+const Loader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-32 w-32 border-b-4 border-blue-600"></div>
+  </div>
+)
 
 const AppRoutes: React.FC = () => {
   const { user, loading } = useAuth()
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
+  if (loading) return <Loader />
 
   return (
     <Routes>
@@ -55,7 +56,7 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* ✅ New My Site Tools route */}
+      {/* New My Site Tools route */}
       <Route
         path="/my-site-tools"
         element={
@@ -70,7 +71,6 @@ const AppRoutes: React.FC = () => {
 
 function App() {
   return (
-    // ✅ Use HashRouter for GitHub Pages routing
     <Router>
       <AuthProvider>
         <AppRoutes />
