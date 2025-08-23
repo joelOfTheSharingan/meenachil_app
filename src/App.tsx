@@ -8,6 +8,7 @@ import HomePage from './pages/HomePage.tsx'
 import AdminDashboard from './pages/AdminDashboard.tsx'
 import SupervisorDashboard from './pages/SupervisorDashboard.tsx'
 import MySiteTools from './pages/MySiteTools.tsx'
+import AllInventoryPage from './pages/AllInventory.tsx'
 
 // ✅ Loader component
 const Loader: React.FC = () => (
@@ -24,7 +25,7 @@ const ErrorFallback: React.FC = () => (
 )
 
 const AppRoutes: React.FC = () => {
-  const { user, loading, error } = useAuth() // ⬅️ Make sure your context exposes `error`
+  const { user, loading, error } = useAuth()
 
   if (loading) return <Loader />
   if (error) return <ErrorFallback />
@@ -63,13 +64,21 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-
-      {/* My Site Tools */}
       <Route
         path="/my-site-tools"
         element={
           <ProtectedRoute allowedRoles={['supervisor']}>
             <MySiteTools />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ All Inventory Page – accessible by both admins & supervisors */}
+      <Route
+        path="/inventory"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'supervisor']}>
+            <AllInventoryPage />
           </ProtectedRoute>
         }
       />

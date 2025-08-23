@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase.ts"; 
-import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase.ts";
+import { useNavigate, Link } from "react-router-dom";
 
 const Dashboard = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -50,15 +50,13 @@ const Dashboard = () => {
   }, []);
 
   const handleLogout = async () => {
-  try {
-    console.log("Attempting to log out..."); // Debugging log
-    await supabase.auth.signOut(); // Log the user out
-    console.log("Logout successful! Redirecting to login..."); // Debugging log
-    navigate("/login"); // Redirect to the login page
-  } catch (error: any) {
-    console.error("Error logging out:", error.message); // Log any errors
-  }
-};
+    try {
+      await supabase.auth.signOut();
+      navigate("/login"); // Redirect to login page
+    } catch (error: any) {
+      console.error("Error logging out:", error.message);
+    }
+  };
 
   if (loading) return <p className="text-gray-500">Loading...</p>;
 
@@ -95,18 +93,10 @@ const Dashboard = () => {
             <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="p-3 text-left text-gray-600 font-medium border-b">
-                    ID
-                  </th>
-                  <th className="p-3 text-left text-gray-600 font-medium border-b">
-                    Name
-                  </th>
-                  <th className="p-3 text-left text-gray-600 font-medium border-b">
-                    Status
-                  </th>
-                  <th className="p-3 text-left text-gray-600 font-medium border-b">
-                    Date Bought
-                  </th>
+                  <th className="p-3 text-left text-gray-600 font-medium border-b">ID</th>
+                  <th className="p-3 text-left text-gray-600 font-medium border-b">Name</th>
+                  <th className="p-3 text-left text-gray-600 font-medium border-b">Status</th>
+                  <th className="p-3 text-left text-gray-600 font-medium border-b">Date Bought</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -136,6 +126,16 @@ const Dashboard = () => {
             </table>
           </div>
         )}
+
+        {/* NEW: See All Equipments button */}
+        <div className="mt-6">
+          <Link
+            to="/inventory"
+            className="inline-block px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            See All Equipments
+          </Link>
+        </div>
       </div>
     </div>
   );
