@@ -10,21 +10,29 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchUserAndEquipment = async () => {
-      // 1. Get logged-in user
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      console.log("Starting fetchUserAndEquipment...");
 
-      if (userError) {
-        console.error("Error fetching user:", userError.message);
-        return;
-      }
+      try {
+        console.log("Getting logged-in user...");
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        console.log("getUser response:", { user, userError });
 
-      if (user) {
+        if (userError) {
+          console.error("Error fetching user:", userError.message);
+          setLoading(false);
+          return;
+        }
+
+        if (!user) {
+          console.warn("No user found!");
+          setLoading(false);
+          return;
+        }
+
         setUserEmail(user.email);
+        console.log("User email set:", user.email);
 
-        // 2. Get equipment belonging to this supervisor
+        console.log("Fetching equipment for user...");
         const { data, error } = await supabase
           .from("equipment")
           .select(`
@@ -36,14 +44,21 @@ const Dashboard = () => {
           `)
           .eq("construction_sites.contractor", user.email);
 
+        console.log("Equipment fetch response:", { data, error });
+
         if (error) {
           console.error("Error fetching equipment:", error.message);
         } else {
           setEquipment(data || []);
+          console.log("Equipment set:", data);
         }
-      }
 
-      setLoading(false);
+      } catch (err) {
+        console.error("Unexpected error:", err);
+      } finally {
+        console.log("Finished fetch, setting loading false.");
+        setLoading(false);
+      }
     };
 
     fetchUserAndEquipment();
@@ -51,50 +66,38 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     try {
+      console.log("Attempting to log out...");
       await supabase.auth.signOut();
+      console.log("Logout successful! Redirecting to login...");
       navigate("/login");
     } catch (error: any) {
       console.error("Error logging out:", error.message);
     }
   };
 
+  console.log("Render: loading =", loading, "equipment.length =", equipment.length);
+
   if (loading) return <p className="text-gray-500">Loading...</p>;
 
   return (
     <div className="p-6">
       <div className="bg-white shadow-lg rounded-xl p-6">
-        {/* Header Section */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-700">
-              Engineer Dashboard
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-700">Engineer Dashboard</h1>
             <p className="text-gray-600">
               Logged in as: <span className="font-semibold">{userEmail}</span>
             </p>
           </div>
-
-          {/* Buttons */}
-          <div className="flex gap-4">
-            <button
-              onClick={() => navigate("/inventory")}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold"
-            >
-              Go to All Equipments
-            </button>
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold"
-            >
-              Logout
-            </button>
-          </div>
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold"
+          >
+            Logout
+          </button>
         </div>
 
-        {/* Equipment Section */}
-        <h2 className="text-xl font-semibold text-gray-700 mb-4">
-          My Equipment
-        </h2>
+        <h2 className="text-xl font-semibold text-gray-700 mb-4">My Equipment</h2>
 
         {equipment.length === 0 ? (
           <p className="text-gray-500">No equipment found.</p>
@@ -103,18 +106,10 @@ const Dashboard = () => {
             <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="p-3 text-left text-gray-600 font-medium border-b">
-                    ID
-                  </th>
-                  <th className="p-3 text-left text-gray-600 font-medium border-b">
-                    Name
-                  </th>
-                  <th className="p-3 text-left text-gray-600 font-medium border-b">
-                    Status
-                  </th>
-                  <th className="p-3 text-left text-gray-600 font-medium border-b">
-                    Date Bought
-                  </th>
+                  <th className="p-3 text-left text-gray-600 font-medium border-b">ID</th>
+                  <th className="p-3 text-left text-gray-600 font-medium border-b">Name</th>
+                  <th className="p-3 text-left text-gray-600 font-medium border-b">Status</th>
+                  <th className="p-3 text-left text-gray-600 font-medium border-b">Date Bought</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -134,9 +129,7 @@ const Dashboard = () => {
                       </span>
                     </td>
                     <td className="p-3 text-gray-700">
-                      {eq.date_bought
-                        ? new Date(eq.date_bought).toLocaleDateString()
-                        : "—"}
+                      {eq.date_bought ? new Date(eq.date_bought).toLocaleDateString() : "—"}
                     </td>
                   </tr>
                 ))}
