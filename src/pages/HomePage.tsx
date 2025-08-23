@@ -1,24 +1,22 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 
 const HomePage: React.FC = () => {
-  const { user } = useAuth()
   const navigate = useNavigate()
-
-  useEffect(() => {
-    if (!user) return
-
-    if (user.role === 'admin') {
-      navigate('/admin')
-    } else if (user.role === 'supervisor') {
-      navigate('/supervisor')
-    }
-  }, [user, navigate])
+  const { user } = useAuth()
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <p>Loading your dashboard...</p>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">Welcome, {user?.email}</h1>
+
+      {/* See All Equipments Button */}
+      <button
+        onClick={() => navigate('/allInventory')}
+        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+      >
+        See All Equipments
+      </button>
     </div>
   )
 }

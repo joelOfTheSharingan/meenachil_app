@@ -42,7 +42,7 @@ const AllEquipment: React.FC = () => {
       <nav className="flex justify-between items-center bg-gray-800 text-white px-4 py-2 rounded-lg mb-6">
         <h1 className="text-xl font-bold">All Equipment</h1>
         <Button onClick={() => navigate("/supervisor")} className="bg-blue-600 hover:bg-blue-700">
-          Go to Dashboard
+          Go to Home
         </Button>
       </nav>
 
