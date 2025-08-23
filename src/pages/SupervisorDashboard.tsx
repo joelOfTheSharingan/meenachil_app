@@ -50,15 +50,13 @@ const Dashboard = () => {
   }, []);
 
   const handleLogout = async () => {
-  try {
-    console.log("Attempting to log out..."); // Debugging log
-    await supabase.auth.signOut(); // Log the user out
-    console.log("Logout successful! Redirecting to login..."); // Debugging log
-    navigate("/login"); // Redirect to the login page
-  } catch (error: any) {
-    console.error("Error logging out:", error.message); // Log any errors
-  }
-};
+    try {
+      await supabase.auth.signOut();
+      navigate("/login");
+    } catch (error: any) {
+      console.error("Error logging out:", error.message);
+    }
+  };
 
   if (loading) return <p className="text-gray-500">Loading...</p>;
 
@@ -75,12 +73,22 @@ const Dashboard = () => {
               Logged in as: <span className="font-semibold">{userEmail}</span>
             </p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold"
-          >
-            Logout
-          </button>
+
+          {/* Buttons */}
+          <div className="flex gap-4">
+            <button
+              onClick={() => navigate("/inventory")}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold"
+            >
+              Go to All Equipments
+            </button>
+            <button
+              onClick={handleLogout}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Equipment Section */}
