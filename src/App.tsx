@@ -9,17 +9,25 @@ import AdminDashboard from './pages/AdminDashboard.tsx'
 import SupervisorDashboard from './pages/SupervisorDashboard.tsx'
 import MySiteTools from './pages/MySiteTools.tsx'
 
-// ✅ Loader component to keep AppRoutes clean
-const Loader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-spin rounded-full h-32 w-32 border-b-4 border-blue-600"></div>
+// ✅ Loader component
+const Loader: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+  </div>
+)
+
+// ✅ Error fallback if auth fails
+const ErrorFallback: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center text-red-600 font-semibold">
+    Something went wrong. Please refresh.
   </div>
 )
 
 const AppRoutes: React.FC = () => {
-  const { user, loading } = useAuth()
+  const { user, loading, error } = useAuth() // ⬅️ Make sure your context exposes `error`
 
   if (loading) return <Loader />
+  if (error) return <ErrorFallback />
 
   return (
     <Routes>
@@ -56,7 +64,7 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* New My Site Tools route */}
+      {/* My Site Tools */}
       <Route
         path="/my-site-tools"
         element={
@@ -65,6 +73,9 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* Catch-all (404) */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
