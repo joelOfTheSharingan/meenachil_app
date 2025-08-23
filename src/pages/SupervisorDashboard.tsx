@@ -2,59 +2,83 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.ts";
 import { useNavigate, Link } from "react-router-dom";
 
-const Dashboard = () => {
+// ✅ Loader Component
+const Loader: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+  </div>
+);
+
+const Dashboard: React.FC = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-  const fetchUserAndEquipment = async () => {
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const fetchUserAndEquipment = async () => {
+      try {
+        console.log("Fetching current user...");
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-      if (userError) console.error("Error fetching user:", userError.message);
+        if (userError) {
+          console.error("Error fetching user:", userError.message);
+          return;
+        }
 
-      if (user) {
-        setUserEmail(user.email);
-        const { data, error } = await supabase
-          .from("equipment")
-          .select(`...`)
-          .eq("construction_sites.contractor", user.email);
+        if (user) {
+          console.log("User fetched:", user.email);
+          setUserEmail(user.email);
 
-        if (error) console.error("Error fetching equipment:", error.message);
-        else setEquipment(data || []);
+          console.log("Fetching equipment assigned to this user...");
+          const { data, error } = await supabase
+            .from("equipment")
+            .select(`
+              id,
+              name,
+              status,
+              date_bought,
+              construction_sites(name)
+            `)
+            .eq("construction_sites.contractor", user.email);
+
+          if (error) {
+            console.error("Error fetching equipment:", error.message);
+          } else {
+            console.log("Equipment fetched:", data);
+            setEquipment(data || []);
+          }
+        } else {
+          console.warn("No user logged in!");
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Unexpected error:", err);
-    } finally {
-      setLoading(false); // <- always stop loading
-    }
-  };
+    };
 
-  fetchUserAndEquipment();
-}, []);
+    fetchUserAndEquipment();
+  }, []);
 
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      navigate("/login"); // Redirect to login page
+      navigate("/login");
     } catch (error: any) {
       console.error("Error logging out:", error.message);
     }
   };
 
-  if (loading) return <p className="text-gray-500">Loading...</p>;
+  if (loading) return <Loader />;
 
   return (
     <div className="p-6">
       <div className="bg-white shadow-lg rounded-xl p-6">
-        {/* Header Section */}
+        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-700">
-              Engineer Dashboard
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-700">Engineer Dashboard</h1>
             <p className="text-gray-600">
               Logged in as: <span className="font-semibold">{userEmail}</span>
             </p>
@@ -67,11 +91,8 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Equipment Section */}
-        <h2 className="text-xl font-semibold text-gray-700 mb-4">
-          My Equipment
-        </h2>
-
+        {/* Equipment Table */}
+        <h2 className="text-xl font-semibold text-gray-700 mb-4">My Equipment</h2>
         {equipment.length === 0 ? (
           <p className="text-gray-500">No equipment found.</p>
         ) : (
@@ -83,6 +104,7 @@ const Dashboard = () => {
                   <th className="p-3 text-left text-gray-600 font-medium border-b">Name</th>
                   <th className="p-3 text-left text-gray-600 font-medium border-b">Status</th>
                   <th className="p-3 text-left text-gray-600 font-medium border-b">Date Bought</th>
+                  <th className="p-3 text-left text-gray-600 font-medium border-b">Site</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -106,6 +128,9 @@ const Dashboard = () => {
                         ? new Date(eq.date_bought).toLocaleDateString()
                         : "—"}
                     </td>
+                    <td className="p-3 text-gray-700">
+                      {eq.construction_sites?.name || "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -113,7 +138,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* NEW: See All Equipments button */}
+        {/* Inventory Link */}
         <div className="mt-6">
           <Link
             to="/inventory"
