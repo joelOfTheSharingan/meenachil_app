@@ -61,7 +61,9 @@ export default function AdminDashboard() {
             alt="Logo"
             className="h-10 w-10"
           />
-          <span className="text-xl font-bold text-gray-800">Admin Dashboard</span>
+          <span className="text-xl font-bold text-gray-800">
+            Admin Dashboard
+          </span>
         </button>
 
         {/* Logout Button */}
@@ -70,6 +72,16 @@ export default function AdminDashboard() {
           className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg transition duration-300"
         >
           Logout
+        </button>
+      </div>
+
+      {/* See All Equipment Button */}
+      <div className="mb-6">
+        <button
+          onClick={() => navigate("/inventory")}
+          className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg transition duration-300"
+        >
+          See All Equipment
         </button>
       </div>
 
@@ -85,20 +97,24 @@ export default function AdminDashboard() {
       {/* User List */}
       {loading ? (
         <p>Loading...</p>
+      ) : users.length > 0 ? (
+        <ul className="space-y-2">
+          {users.map((user) => (
+            <li key={user.id} className="p-4 border rounded">
+              <p>
+                <strong>Name:</strong> {user.name}
+              </p>
+              <p>
+                <strong>Email:</strong> {user.email}
+              </p>
+              <p>
+                <strong>Role:</strong> {user.role}
+              </p>
+            </li>
+          ))}
+        </ul>
       ) : (
-        users.length > 0 ? (
-          <ul className="space-y-2">
-            {users.map((user) => (
-              <li key={user.id} className="p-4 border rounded">
-                <p><strong>Name:</strong> {user.name}</p>
-                <p><strong>Email:</strong> {user.email}</p>
-                <p><strong>Role:</strong> {user.role}</p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          searchTerm && <p>No users found.</p>
-        )
+        searchTerm && <p>No users found.</p>
       )}
     </div>
   );
