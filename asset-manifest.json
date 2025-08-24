@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/meenachil_app/static/css/main.8265bb70.css",
+    "main.js": "/meenachil_app/static/js/main.d14b75ea.js",
+    "index.html": "/meenachil_app/index.html",
+    "main.8265bb70.css.map": "/meenachil_app/static/css/main.8265bb70.css.map",
+    "main.d14b75ea.js.map": "/meenachil_app/static/js/main.d14b75ea.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.8265bb70.css",
+    "static/js/main.d14b75ea.js"
+  ]
+}
