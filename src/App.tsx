@@ -17,7 +17,7 @@ const Loader: React.FC = () => (
   </div>
 )
 
-// ✅ Error fallback if auth fails
+// ✅ Error fallback
 const ErrorFallback: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center text-red-600 font-semibold">
     Something went wrong. Please refresh.
@@ -33,11 +33,18 @@ const AppRoutes: React.FC = () => {
   return (
     <Routes>
       {/* Default route */}
-      <Route path="/" element={user ? <Navigate to="/home" replace /> : <SignUpPage />} />
+      <Route
+        path="/"
+        element={
+          user
+            ? <Navigate to="/home" replace />
+            : <Navigate to="/login" replace />  // ✅ redirect instead of showing signup directly
+        }
+      />
 
       {/* Auth routes */}
-      <Route path="/login" element={user ? <Navigate to="/home" replace /> : <LoginPage />} />
-      <Route path="/signup" element={user ? <Navigate to="/home" replace /> : <SignUpPage />} />
+      <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/home" replace />} />
+      <Route path="/signup" element={!user ? <SignUpPage /> : <Navigate to="/home" replace />} />
 
       {/* Protected routes */}
       <Route
@@ -72,8 +79,6 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-
-      {/* ✅ All Inventory Page – accessible by both admins & supervisors */}
       <Route
         path="/inventory"
         element={
@@ -83,7 +88,7 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Catch-all (404) */}
+      {/* 404 → go home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
@@ -91,11 +96,11 @@ const AppRoutes: React.FC = () => {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
+    <AuthProvider>
+      <Router>
         <AppRoutes />
-      </AuthProvider>
-    </Router>
+      </Router>
+    </AuthProvider>
   )
 }
 
