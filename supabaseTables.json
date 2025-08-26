@@ -15,6 +15,16 @@
     "data_type": "text"
   },
   {
+    "table_name": "construction_sites",
+    "column_name": "supervisor_id",
+    "data_type": "uuid"
+  },
+  {
+    "table_name": "construction_sites",
+    "column_name": "contractor_id",
+    "data_type": "uuid"
+  },
+  {
     "table_name": "equipment",
     "column_name": "id",
     "data_type": "bigint"
@@ -33,6 +43,16 @@
     "table_name": "equipment",
     "column_name": "site_id",
     "data_type": "bigint"
+  },
+  {
+    "table_name": "equipment",
+    "column_name": "date_bought",
+    "data_type": "date"
+  },
+  {
+    "table_name": "equipment",
+    "column_name": "isRental",
+    "data_type": "boolean"
   },
   {
     "table_name": "equipment_transfers",
@@ -75,6 +95,16 @@
     "data_type": "uuid"
   },
   {
+    "table_name": "temp_user_site_mapping",
+    "column_name": "user_id",
+    "data_type": "uuid"
+  },
+  {
+    "table_name": "temp_user_site_mapping",
+    "column_name": "site_id",
+    "data_type": "uuid"
+  },
+  {
     "table_name": "users",
     "column_name": "id",
     "data_type": "uuid"
@@ -107,6 +137,11 @@
   {
     "table_name": "users",
     "column_name": "site_id",
-    "data_type": "uuid"
+    "data_type": "bigint"
+  },
+  {
+    "table_name": "users",
+    "column_name": "username",
+    "data_type": "text"
   }
 ]

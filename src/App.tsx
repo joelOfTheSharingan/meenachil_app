@@ -9,6 +9,7 @@ import AdminDashboard from './pages/AdminDashboard.tsx'
 import SupervisorDashboard from './pages/SupervisorDashboard.tsx'
 import MySiteTools from './pages/MySiteTools.tsx'
 import AllInventoryPage from './pages/AllInventory.tsx'
+import NewRequestsPage from './pages/NewRequests.tsx'   // ✅ new page import
 
 // ✅ Loader component
 const Loader: React.FC = () => (
@@ -38,7 +39,7 @@ const AppRoutes: React.FC = () => {
         element={
           user
             ? <Navigate to="/home" replace />
-            : <Navigate to="/login" replace />  // ✅ redirect instead of showing signup directly
+            : <Navigate to="/login" replace />
         }
       />
 
@@ -84,6 +85,16 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute allowedRoles={['admin', 'supervisor']}>
             <AllInventoryPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ New Requests page for supervisors */}
+      <Route
+        path="/newRequests"
+        element={
+          <ProtectedRoute allowedRoles={['supervisor']}>
+            <NewRequestsPage />
           </ProtectedRoute>
         }
       />
