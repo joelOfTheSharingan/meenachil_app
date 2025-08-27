@@ -10,6 +10,7 @@ const NewRequests: React.FC = () => {
   const [toSiteId, setToSiteId] = useState<string>("")
   const [equipmentList, setEquipmentList] = useState<{ id: string; name: string }[]>([])
   const [equipmentId, setEquipmentId] = useState<string>("")
+  const [quantity, setQuantity] = useState<number>(1) // ✅ new state for quantity
   const [loading, setLoading] = useState<boolean>(false)
 
   // ✅ Fetch logged-in user's site_id -> site_name
@@ -67,28 +68,27 @@ const NewRequests: React.FC = () => {
   }, [])
 
   // ✅ Fetch equipment for user’s site
-useEffect(() => {
-  const fetchEquipment = async () => {
-    const { data, error } = await supabase
-      .from("equipment")
-      .select("id, name") // fetch all equipment
+  useEffect(() => {
+    const fetchEquipment = async () => {
+      const { data, error } = await supabase
+        .from("equipment")
+        .select("id, name")
 
-    if (error) {
-      console.error("Error fetching equipment:", error)
-      return
+      if (error) {
+        console.error("Error fetching equipment:", error)
+        return
+      }
+
+      setEquipmentList(data || [])
     }
 
-    setEquipmentList(data || [])
-  }
-
-  fetchEquipment()
-}, [])
-
+    fetchEquipment()
+  }, [])
 
   // ✅ Handle submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!fromSiteId || !user?.id || !equipmentId || !toSiteId) return
+    if (!fromSiteId || !user?.id || !equipmentId || !toSiteId || quantity <= 0) return
 
     setLoading(true)
 
@@ -101,6 +101,7 @@ useEffect(() => {
           to_site_id: toSiteId,
           requested_by: user.id, // FK to users
           status: "pending",
+          quantity: quantity, // ✅ include quantity
         },
       ])
 
@@ -113,6 +114,7 @@ useEffect(() => {
       alert("✅ Request submitted successfully")
       setEquipmentId("")
       setToSiteId("")
+      setQuantity(1) // reset
     }
   }
 
@@ -160,6 +162,19 @@ useEffect(() => {
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Quantity Input */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Quantity</label>
+          <input
+            type="number"
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
+            min={1}
+            required
+            className="w-full border rounded-lg p-2"
+          />
         </div>
 
         {/* To Site */}
