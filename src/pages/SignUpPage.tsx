@@ -1,11 +1,10 @@
 import React, { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 
 const SignUpPage: React.FC = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<'admin' | 'supervisor'>('supervisor')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -17,13 +16,14 @@ const SignUpPage: React.FC = () => {
     setError('')
     setLoading(true)
 
-    const { error } = await signUp(email, password, role)
+    // Default role is 'supervisor'
+    const { error } = await signUp(email, password, 'supervisor')
     setLoading(false)
 
     if (error) {
       setError(error.message)
     } else {
-      navigate('/home') // SPA navigation instead of full reload
+      navigate('/home') // SPA navigation
     }
   }
 
@@ -61,15 +61,6 @@ const SignUpPage: React.FC = () => {
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
 
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as 'admin' | 'supervisor')}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="supervisor">Supervisor</option>
-            <option value="admin">Admin</option>
-          </select>
-
           <button
             type="submit"
             disabled={loading}
@@ -92,13 +83,14 @@ const SignUpPage: React.FC = () => {
             Sign up with Google
           </button>
         </div>
+
         <button
-              type="button"
-              onClick={() => navigate('/login')}
-              className="text-blue-600 hover:text-blue-500 text-align-center w-full mt-4"
-            >
-              Already have an account? Login
-            </button>
+          type="button"
+          onClick={() => navigate('/login')}
+          className="text-blue-600 hover:text-blue-500 w-full mt-4 text-center"
+        >
+          Already have an account? Login
+        </button>
       </div>
     </div>
   )
