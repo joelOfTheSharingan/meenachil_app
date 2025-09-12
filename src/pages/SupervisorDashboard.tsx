@@ -281,48 +281,52 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* My Site Tools */}
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-blue-800 mb-4">My Site Tools</h2>
-          <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
-            {myEquipment.length === 0 ? (
-              <p className="text-gray-500">No equipment found.</p>
-            ) : (
-              myEquipment.map((eq, index) => (
-                <div
-                  key={index}
-                  className="flex justify-between items-center bg-white p-3 mb-2 rounded-md shadow-sm"
-                >
-                  <span className="text-gray-700 font-medium">{eq.name}</span>
-                  <span className="text-gray-900 font-bold px-3 py-1 bg-gray-200 rounded-full">
-                    {eq.count}
-                  </span>
-                </div>
-              ))
-            )}
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-blue-800 mb-4">My Site Tools</h2>
+            <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
+              {myEquipment.filter(eq => eq.count > 0).length === 0 ? (
+                <p className="text-gray-500">No equipment found.</p>
+              ) : (
+                myEquipment
+                  .filter(eq => eq.count > 0)
+                  .map((eq, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center bg-white p-3 mb-2 rounded-md shadow-sm"
+                    >
+                      <span className="text-gray-700 font-medium">{eq.name}</span>
+                      <span className="text-gray-900 font-bold px-3 py-1 bg-gray-200 rounded-full">
+                        {eq.count}
+                      </span>
+                    </div>
+                  ))
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Rental Tools */}
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-700 mb-4">Rental</h2>
-          <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
-            {rentalEquipment.length === 0 ? (
-              <p className="text-gray-500">No rental equipment found.</p>
-            ) : (
-              rentalEquipment.map((eq, index) => (
-                <div
-                  key={index}
-                  className="flex justify-between items-center bg-white p-3 mb-2 rounded-md shadow-sm"
-                >
-                  <span className="text-gray-700 font-medium">{eq.name}</span>
-                  <span className="text-gray-900 font-bold px-3 py-1 bg-gray-200 rounded-full">
-                    {eq.count}
-                  </span>
-                </div>
-              ))
-            )}
+          {/* Rental Tools */}
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-700 mb-4">Rental</h2>
+            <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
+              {rentalEquipment.filter(eq => eq.count > 0).length === 0 ? (
+                <p className="text-gray-500">No rental equipment found.</p>
+              ) : (
+                rentalEquipment
+                  .filter(eq => eq.count > 0)
+                  .map((eq, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center bg-white p-3 mb-2 rounded-md shadow-sm"
+                    >
+                      <span className="text-gray-700 font-medium">{eq.name}</span>
+                      <span className="text-gray-900 font-bold px-3 py-1 bg-gray-200 rounded-full">
+                        {eq.count}
+                      </span>
+                    </div>
+                  ))
+              )}
+            </div>
           </div>
-        </div>
 
         {/* Incoming Requests */}
         <div className="mb-6">
