@@ -1,18 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.ts";
 import { useAuth } from "../contexts/AuthContext.tsx";
-import { useNavigate } from "react-router-dom"; // ✅ import navigate
+import { useNavigate } from "react-router-dom";
 
 const NewRequests: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate(); // ✅ initialize navigate
+  const navigate = useNavigate();
+
   const [fromSiteId, setFromSiteId] = useState<string>("");
   const [fromSiteName, setFromSiteName] = useState<string>("");
   const [toSites, setToSites] = useState<{ id: string; site_name: string }[]>([]);
   const [toSiteId, setToSiteId] = useState<string>("");
-  const [equipmentList, setEquipmentList] = useState<{ id: string; name: string }[]>([]);
-  const [equipmentId, setEquipmentId] = useState<string>("");
+
+  const [equipmentList, setEquipmentList] = useState<
+    { id: number; name: string; total: number }[]
+  >([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
+  const [maxQuantity, setMaxQuantity] = useState<number>(1);
+
   const [loading, setLoading] = useState<boolean>(false);
 
   // Fetch logged-in user's site_id -> site_name
@@ -69,68 +75,78 @@ const NewRequests: React.FC = () => {
     fetchSites();
   }, []);
 
-  // Fetch equipment for user's site
+  // Fetch equipment for user's site and group by name
   useEffect(() => {
+    if (!fromSiteId) return;
+
     const fetchEquipment = async () => {
       const { data, error } = await supabase
         .from("equipment")
-        .select("id, name");
+        .select("id, name, quantity")
+        .eq("site_id", fromSiteId);
 
       if (error) {
         console.error("Error fetching equipment:", error);
         return;
       }
 
-      // Deduplicate by name
-      const unique = Array.from(
-        new Map((data || []).map((item) => [item.name, item])).values()
-      );
+      // ✅ Group by name and keep the first id
+      const grouped: Record<string, { id: number; total: number }> = {};
+      (data || []).forEach((eq) => {
+        if (!grouped[eq.name]) {
+          grouped[eq.name] = { id: eq.id, total: 0 };
+        }
+        grouped[eq.name].total += eq.quantity || 0;
+      });
 
-      setEquipmentList(unique);
+      const result = Object.entries(grouped).map(([name, { id, total }]) => ({
+        id,
+        name,
+        total,
+      }));
+
+      setEquipmentList(result);
     };
 
     fetchEquipment();
-  }, []);
+  }, [fromSiteId]);
+
+  // Update maxQuantity when equipment changes
+  useEffect(() => {
+    if (!selectedEquipment) {
+      setMaxQuantity(1);
+      setQuantity(1);
+      return;
+    }
+
+    const selected = equipmentList.find(
+      (eq) => eq.id.toString() === selectedEquipment
+    );
+    if (selected) {
+      setMaxQuantity(selected.total);
+      if (quantity > selected.total) setQuantity(selected.total);
+    }
+  }, [selectedEquipment, equipmentList]);
 
   // Handle submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fromSiteId || !user?.id || !equipmentId || !toSiteId || quantity <= 0) return;
+    if (!fromSiteId || !user?.id || !selectedEquipment || !toSiteId || quantity <= 0)
+      return;
 
     setLoading(true);
 
-    // Check if equipment is available
-    const { data: equipmentData, error: eqError } = await supabase
-      .from("equipment")
-      .select("id, status, quantity")
-      .eq("id", equipmentId)
-      .single();
-
-    if (eqError || !equipmentData) {
-      setLoading(false);
-      alert("❌ Failed to fetch equipment data");
-      return;
-    }
-
-    if (equipmentData.status !== "available" || equipmentData.quantity < quantity) {
-      setLoading(false);
-      alert("❌ This equipment is not available in the requested quantity");
-      return;
-    }
-
-    // Insert transfer request
-    const { error } = await supabase
-      .from("equipment_transfers")
-      .insert([
-        {
-          equipment_id: equipmentId,
-          from_site_id: fromSiteId,
-          to_site_id: toSiteId,
-          requested_by: user.id,
-          status: "pending",
-          quantity: quantity,
-        },
-      ]);
+    // ✅ Insert transfer request using equipment_id
+    const { error } = await supabase.from("equipment_transfers").insert([
+      {
+        equipment_id: Number(selectedEquipment),
+        from_site_id: fromSiteId,
+        to_site_id: toSiteId,
+        requested_by: user.id,
+        status: "pending",
+        quantity: quantity,
+      },
+    ]);
 
     setLoading(false);
 
@@ -139,18 +155,10 @@ const NewRequests: React.FC = () => {
       alert("❌ Failed to create request");
     } else {
       alert("✅ Request submitted successfully");
-
-      // Reset form
-      setEquipmentId("");
-      setToSiteId("");
-      setQuantity(1);
-
-      // ✅ Redirect to dashboard
       navigate("/dashboard");
     }
   };
 
-  // User has no site assigned
   if (!fromSiteId) {
     return (
       <div className="p-6 max-w-lg mx-auto bg-white shadow-md rounded-xl">
@@ -180,17 +188,19 @@ const NewRequests: React.FC = () => {
 
         {/* Equipment Dropdown */}
         <div>
-          <label className="block text-sm font-medium mb-1">Equipment to Transfer</label>
+          <label className="block text-sm font-medium mb-1">
+            Equipment to Transfer
+          </label>
           <select
-            value={equipmentId}
-            onChange={(e) => setEquipmentId(e.target.value)}
+            value={selectedEquipment}
+            onChange={(e) => setSelectedEquipment(e.target.value)}
             required
             className="w-full border rounded-lg p-2"
           >
             <option value="">Select equipment</option>
             {equipmentList.map((eq) => (
               <option key={eq.id} value={eq.id}>
-                {eq.name}
+                {eq.name} (Available: {eq.total})
               </option>
             ))}
           </select>
@@ -198,12 +208,17 @@ const NewRequests: React.FC = () => {
 
         {/* Quantity Input */}
         <div>
-          <label className="block text-sm font-medium mb-1">Quantity</label>
+          <label className="block text-sm font-medium mb-1">
+            Quantity (Max: {maxQuantity})
+          </label>
           <input
             type="number"
             value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
+            onChange={(e) =>
+              setQuantity(Math.min(Number(e.target.value), maxQuantity))
+            }
             min={1}
+            max={maxQuantity}
             required
             className="w-full border rounded-lg p-2"
           />
