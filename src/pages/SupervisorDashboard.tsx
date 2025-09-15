@@ -437,7 +437,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Outgoing Requests */}
-        {/* Outgoing Requests */}
+<h2 className="text-xl font-bold text-blue-700 mb-4">Outgoing Requests</h2>
 {outgoingRequests.length === 0 ? (
   <p className="text-gray-500">No outgoing requests.</p>
 ) : (
