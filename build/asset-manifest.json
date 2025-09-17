@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/meenachil_app/static/css/main.57da5a13.css",
-    "main.js": "/meenachil_app/static/js/main.81fedf90.js",
+    "main.js": "/meenachil_app/static/js/main.d1a07c3b.js",
     "index.html": "/meenachil_app/index.html",
     "main.57da5a13.css.map": "/meenachil_app/static/css/main.57da5a13.css.map",
-    "main.81fedf90.js.map": "/meenachil_app/static/js/main.81fedf90.js.map"
+    "main.d1a07c3b.js.map": "/meenachil_app/static/js/main.d1a07c3b.js.map"
   },
   "entrypoints": [
     "static/css/main.57da5a13.css",
-    "static/js/main.81fedf90.js"
+    "static/js/main.d1a07c3b.js"
   ]
 }

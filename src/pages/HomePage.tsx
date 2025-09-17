@@ -1,74 +1,106 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext.tsx'
-import { supabase } from '../lib/supabase.ts'
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext.tsx';
+import { supabase } from '../lib/supabase.ts';
 
 const HomePage: React.FC = () => {
-  const navigate = useNavigate()
-  const { user, signOut } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<{ username: string; phone: string } | null>(null)
-  const [username, setUsername] = useState('')
-  const [phone, setPhone] = useState('')
-  const [error, setError] = useState('')
-  const [redirected, setRedirected] = useState(false) // ✅ prevent loop
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<{ username: string; phone: string; role?: string } | null>(null);
+  const [username, setUsername] = useState('');
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const [redirected, setRedirected] = useState(false);
 
-  // 1️⃣ Check if user has profile info
+  // Check if user has profile info and role
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!user || redirected) return
+      if (!user || redirected) return;
 
-      const { data, error } = await supabase
-        .from('users')
-        .select('username, phone')
-        .eq('id', user.id)
-        .single()
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('username, phone, role')
+          .eq('id', user.id)
+          .single();
 
-      if (error) {
-        console.error('Error fetching profile:', error.message)
-      } else {
-        setProfile(data)
-        if (!data.username || !data.phone) {
-          setUsername(data.username || '')
-          setPhone(data.phone || '')
-        } else {
-          // Already has username & phone → go to dashboard
-          setRedirected(true)
-          navigate('/supervisor')
+        if (error) {
+          console.error('Error fetching profile:', error.message);
+          setError('Failed to fetch profile');
+          setLoading(false);
+          return;
         }
-      }
-      setLoading(false)
-    }
 
-    fetchProfile()
-  }, [user, navigate, redirected])
+        setProfile(data);
+        if (!data.username || !data.phone) {
+          // Incomplete profile
+          setUsername(data.username || '');
+          setPhone(data.phone || '');
+        } else {
+          // Complete profile, check role and redirect
+          setRedirected(true);
+          const destination = data.role === 'admin' ? '/admin' : '/supervisor';
+          navigate(destination);
+        }
+      } catch (err) {
+        console.error('Unexpected error:', err);
+        setError('An unexpected error occurred');
+      }
+      setLoading(false);
+    };
+
+    fetchProfile();
+  }, [user, navigate, redirected]);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
+    e.preventDefault();
+    setError('');
     if (!username || !phone) {
-      setError('Please fill in both fields.')
-      return
+      setError('Please fill in both fields.');
+      return;
     }
 
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ username, phone })
-      .eq('id', user?.id)
+    try {
+      const { error: updateError } = await supabase
+        .from('users')
+        .upsert({ id: user?.id, username, phone })
+        .eq('id', user?.id);
 
-    if (updateError) {
-      setError(updateError.message)
-    } else {
-      navigate('/supervisor')
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+
+      // After saving profile, fetch role to determine redirect
+      const { data, error: fetchError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user?.id)
+        .single();
+
+      if (fetchError) {
+        setError(fetchError.message);
+        return;
+      }
+
+      const destination = data.role === 'admin' ? '/admin' : '/supervisor';
+      navigate(destination);
+    } catch (err) {
+      setError('An unexpected error occurred');
     }
-  }
+  };
 
   const handleLogout = async () => {
-    const { error } = await signOut()
-    if (!error) navigate('/login')
-  }
+    try {
+      const { error } = await signOut();
+      if (!error) navigate('/login');
+    } catch (err) {
+      setError('Failed to log out');
+    }
+  };
 
-  if (loading) return <p className="p-6">Loading...</p>
+  if (loading) return <p className="p-6">Loading...</p>;
 
   // If profile is incomplete, show form
   if (!profile || !profile.username || !profile.phone) {
@@ -109,11 +141,11 @@ const HomePage: React.FC = () => {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   // Fallback
-  return <p>Redirecting...</p>
-}
+  return <p>Redirecting...</p>;
+};
 
-export default HomePage
+export default HomePage;
