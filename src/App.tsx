@@ -2,6 +2,8 @@ import React from 'react'
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext.tsx'
 import { ProtectedRoute } from './components/ProtectedRoute.tsx'
+
+// Pages
 import { LoginPage } from './pages/LoginPage.tsx'
 import SignUpPage from './pages/SignUpPage.tsx'
 import HomePage from './pages/HomePage.tsx'
@@ -9,16 +11,18 @@ import AdminDashboard from './pages/AdminDashboard.tsx'
 import SupervisorDashboard from './pages/SupervisorDashboard.tsx'
 import MySiteTools from './pages/MySiteTools.tsx'
 import AllInventoryPage from './pages/AllInventory.tsx'
-import NewRequestsPage from './pages/NewRequests.tsx'   // ✅ new page import
+import NewRequestsPage from './pages/NewRequests.tsx'
+import UserManagement from './pages/Users.tsx' // ✅ User Management page
+import AssignSites from './pages/AssignSites.tsx' // ✅ Assign Sites page
 
-// ✅ Loader component
+// Loader component
 const Loader: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
     <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
   </div>
 )
 
-// ✅ Error fallback
+// Error fallback
 const ErrorFallback: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center text-red-600 font-semibold">
     Something went wrong. Please refresh.
@@ -36,11 +40,7 @@ const AppRoutes: React.FC = () => {
       {/* Default route */}
       <Route
         path="/"
-        element={
-          user
-            ? <Navigate to="/home" replace />
-            : <Navigate to="/login" replace />
-        }
+        element={user ? <Navigate to="/home" replace /> : <Navigate to="/login" replace />}
       />
 
       {/* Auth routes */}
@@ -88,8 +88,6 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-
-      {/* ✅ New Requests page for supervisors */}
       <Route
         path="/newRequests"
         element={
@@ -99,7 +97,27 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* 404 → go home */}
+      {/* User Management page (admin only) */}
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <UserManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Assign Sites page (admin only) */}
+      <Route
+        path="/assign-sites"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AssignSites />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* 404 → redirect home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
