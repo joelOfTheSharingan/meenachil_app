@@ -10,9 +10,15 @@ const Loader: React.FC = () => (
   </div>
 );
 
+interface Site {
+  id: string;
+  site_name: string;
+}
+
 const Dashboard: React.FC = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userSiteId, setUserSiteId] = useState<string | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const [userSites, setUserSites] = useState<Site[]>([]);
   const [myEquipment, setMyEquipment] = useState<any[]>([]);
   const [rentalEquipment, setRentalEquipment] = useState<any[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
@@ -20,7 +26,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Refresh incoming requests (to this site)
+  // Refresh incoming requests (to selected site)
   const refreshRequests = async (siteId: string) => {
     try {
       const { data: requestsData, error } = await supabase
@@ -53,8 +59,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Refresh outgoing requests (from this site)
-
+  // Refresh outgoing requests (from selected site)
   const refreshOutgoingRequests = async (siteId: string) => {
     try {
       const { data: outgoingData, error } = await supabase
@@ -87,7 +92,8 @@ const Dashboard: React.FC = () => {
       console.error("Unexpected error while fetching outgoing requests:", err);
     }
   };
-  // Refresh equipment for current site
+
+  // Refresh equipment for selected site
   const refreshEquipment = async (siteId: string) => {
     const { data: equipmentData, error: eqError } = await supabase
       .from("equipment")
@@ -115,6 +121,36 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Fetch all sites associated with the user
+  const fetchUserSites = async (userId: string) => {
+    try {
+      const { data: sitesData, error } = await supabase
+        .from("construction_sites")
+        .select("id, site_name")
+        .eq("supervisor_id", userId);
+
+      if (error) {
+        console.error("Error fetching user sites:", error.message);
+        return [];
+      }
+
+      return sitesData || [];
+    } catch (err) {
+      console.error("Unexpected error while fetching sites:", err);
+      return [];
+    }
+  };
+
+  // Handle site selection change
+  const handleSiteChange = async (siteId: string) => {
+    setSelectedSiteId(siteId);
+    if (siteId) {
+      await refreshEquipment(siteId);
+      await refreshRequests(siteId);
+      await refreshOutgoingRequests(siteId);
+    }
+  };
+
   useEffect(() => {
     const fetchUserAndEquipment = async () => {
       try {
@@ -130,32 +166,34 @@ const Dashboard: React.FC = () => {
 
         setUserEmail(user.email);
 
-        const { data: userData, error: userDbError } = await supabase
+        // First get this user's row from "users" table using auth_id
+        const { data: userRow, error: userDbError } = await supabase
           .from("users")
-          .select("site_id")
+          .select("id")
           .eq("auth_id", user.id)
           .single();
 
-        if (userDbError || !userData) {
-          console.error(
-            "Error fetching user site ID:",
-            userDbError?.message || "User not found."
-          );
-          setLoading(false);
+        if (userDbError || !userRow) {
+          console.error("Could not find user row:", userDbError?.message);
           return;
         }
 
-        setUserSiteId(userData.site_id);
+        const userId = userRow.id; // ✅ this matches supervisor_id in construction_sites
 
-        if (!userData.site_id) {
-          console.warn("User is not assigned to a site.");
-          setLoading(false);
-          return;
+        // Now fetch sites using users.id
+        const sites = await fetchUserSites(userId);
+        setUserSites(sites);
+
+        // Set initial selected site to the first available site
+        const initialSiteId = sites.length > 0 ? sites[0].id : null;
+        if (initialSiteId) {
+          setSelectedSiteId(initialSiteId);
+          await refreshEquipment(initialSiteId);
+          await refreshRequests(initialSiteId);
+          await refreshOutgoingRequests(initialSiteId);
+        } else {
+          console.warn("User has no sites assigned.");
         }
-
-        await refreshEquipment(userData.site_id);
-        await refreshRequests(userData.site_id);
-        await refreshOutgoingRequests(userData.site_id);
       } catch (err) {
         console.error("Unexpected error:", err);
       } finally {
@@ -200,9 +238,9 @@ const Dashboard: React.FC = () => {
       if (transferError) throw transferError;
 
       if (!accept) {
-        if (userSiteId) {
-          await refreshRequests(userSiteId);
-          await refreshOutgoingRequests(userSiteId);
+        if (selectedSiteId) {
+          await refreshRequests(selectedSiteId);
+          await refreshOutgoingRequests(selectedSiteId);
         }
         return;
       }
@@ -245,10 +283,10 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      if (userSiteId) {
-        await refreshRequests(userSiteId);
-        await refreshOutgoingRequests(userSiteId);
-        await refreshEquipment(userSiteId);
+      if (selectedSiteId) {
+        await refreshRequests(selectedSiteId);
+        await refreshOutgoingRequests(selectedSiteId);
+        await refreshEquipment(selectedSiteId);
       }
     } catch (err: any) {
       alert("Error processing transfer: " + err.message);
@@ -269,8 +307,8 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      if (userSiteId) {
-        await refreshOutgoingRequests(userSiteId);
+      if (selectedSiteId) {
+        await refreshOutgoingRequests(selectedSiteId);
       }
     } catch (err: any) {
       alert("Error cancelling transfer: " + err.message);
@@ -283,6 +321,8 @@ const Dashboard: React.FC = () => {
   const pendingRequests = incomingRequests.filter(
     (req) => req.status === "pending"
   );
+
+  const selectedSite = userSites.find(site => site.id === selectedSiteId);
 
   return (
     <div className="p-6">
@@ -336,146 +376,179 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* My Site Tools */}
+        {/* Site Selection Dropdown */}
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-blue-800 mb-4">My Site Tools</h2>
-          <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
-            {myEquipment.filter((eq) => eq.count > 0).length === 0 ? (
-              <p className="text-gray-500">No equipment found.</p>
-            ) : (
-              myEquipment
-                .filter((eq) => eq.count > 0)
-                .map((eq, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center bg-white p-3 mb-2 rounded-md shadow-sm"
-                  >
-                    <span className="text-gray-700 font-medium">{eq.name}</span>
-                    <span className="text-gray-900 font-bold px-3 py-1 bg-gray-200 rounded-full">
-                      {eq.count}
-                    </span>
-                  </div>
-                ))
-            )}
-          </div>
-        </div>
-
-        {/* Rental Tools */}
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-700 mb-4">Rental</h2>
-          <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
-            {rentalEquipment.filter((eq) => eq.count > 0).length === 0 ? (
-              <p className="text-gray-500">No rental equipment found.</p>
-            ) : (
-              rentalEquipment
-                .filter((eq) => eq.count > 0)
-                .map((eq, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center bg-white p-3 mb-2 rounded-md shadow-sm"
-                  >
-                    <span className="text-gray-700 font-medium">{eq.name}</span>
-                    <span className="text-gray-900 font-bold px-3 py-1 bg-gray-200 rounded-full">
-                      {eq.count}
-                    </span>
-                  </div>
-                ))
-            )}
-          </div>
-        </div>
-
-        {/* Incoming Requests */}
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-green-700 mb-4">Incoming Requests</h2>
-          <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
-            {pendingRequests.length === 0 ? (
-              <p className="text-gray-500">No pending requests.</p>
-            ) : (
-              pendingRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm"
-                >
-                  <span className="font-medium text-gray-700">
-                    {req.equipment?.name || "Unknown Equipment"}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    Quantity: {req.quantity ?? "N/A"}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    From: {req.from_site?.site_name || "Unknown Site"}
-                  </span>
-                  <span className="text-sm text-gray-500">Status: {req.status}</span>
-                  <span className="text-xs text-gray-400">
-                    Requested: {new Date(req.requested_at).toLocaleString()}
-                  </span>
-
-                  <div className="mt-2 flex space-x-2">
-                    <button
-                      className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
-                      onClick={() => handleDecision(req, true)}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
-                      onClick={() => {
-                        if (
-                          window.confirm("Are you sure you want to reject this request?")
-                        ) {
-                          handleDecision(req, false);
-                        }
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Outgoing Requests */}
-
-<h2 className="text-xl font-bold text-blue-700 mb-4">Outgoing Requests</h2>
-<div className="bg-gray-100 p-4 rounded-lg shadow-inner">
-{outgoingRequests.length === 0 ? (
-  <p className="text-gray-500">No outgoing requests.</p>
-) : (
-  outgoingRequests.map((req) => (
-    <div key={req.id} className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm">
-      <span className="font-medium text-gray-700">
-        {req.equipment?.name || "Unknown Equipment"}
-      </span>
-      <span className="text-sm text-gray-500">Quantity: {req.quantity ?? "N/A"}</span>
-      <span className="text-sm text-gray-500">
-        To: {req.to_site?.site_name || "Unknown Site"}
-      </span>
-      <span className="text-sm text-gray-500">Status: {req.status}</span>
-      <span className="text-xs text-gray-400">
-        Requested: {new Date(req.requested_at).toLocaleString()}
-      </span>
-
-      {req.status === "pending" && (
-        <div className="mt-2">
-          <button
-            className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
-            onClick={() => {
-              if (window.confirm("Are you sure you want to cancel this transfer?")) {
-                handleCancelTransfer(req);
-              }
-            }}
+          <label htmlFor="site-select" className="block text-sm font-medium text-gray-700 mb-2">
+            Select Construction Site:
+          </label>
+          <select
+            id="site-select"
+            value={selectedSiteId || ""}
+            onChange={(e) => handleSiteChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            Cancel
-          </button>
+            <option value="" disabled>Choose a site...</option>
+            {userSites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.site_name}
+              </option>
+            ))}
+          </select>
+          {selectedSite && (
+            <p className="text-sm text-gray-600 mt-1">
+              Currently viewing: <strong>{selectedSite.site_name}</strong>
+            </p>
+          )}
         </div>
-      )}
-    </div>
-  ))
-)}
-</div>
 
+        {selectedSiteId ? (
+          <>
+            {/* My Site Tools */}
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-blue-800 mb-4">My Site Tools</h2>
+              <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
+                {myEquipment.filter((eq) => eq.count > 0).length === 0 ? (
+                  <p className="text-gray-500">No equipment found.</p>
+                ) : (
+                  myEquipment
+                    .filter((eq) => eq.count > 0)
+                    .map((eq, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center bg-white p-3 mb-2 rounded-md shadow-sm"
+                      >
+                        <span className="text-gray-700 font-medium">{eq.name}</span>
+                        <span className="text-gray-900 font-bold px-3 py-1 bg-gray-200 rounded-full">
+                          {eq.count}
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+
+            {/* Rental Tools */}
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-700 mb-4">Rental</h2>
+              <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
+                {rentalEquipment.filter((eq) => eq.count > 0).length === 0 ? (
+                  <p className="text-gray-500">No rental equipment found.</p>
+                ) : (
+                  rentalEquipment
+                    .filter((eq) => eq.count > 0)
+                    .map((eq, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center bg-white p-3 mb-2 rounded-md shadow-sm"
+                      >
+                        <span className="text-gray-700 font-medium">{eq.name}</span>
+                        <span className="text-gray-900 font-bold px-3 py-1 bg-gray-200 rounded-full">
+                          {eq.count}
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+
+            {/* Incoming Requests */}
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-green-700 mb-4">Incoming Requests</h2>
+              <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
+                {pendingRequests.length === 0 ? (
+                  <p className="text-gray-500">No pending requests.</p>
+                ) : (
+                  pendingRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm"
+                    >
+                      <span className="font-medium text-gray-700">
+                        {req.equipment?.name || "Unknown Equipment"}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        Quantity: {req.quantity ?? "N/A"}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        From: {req.from_site?.site_name || "Unknown Site"}
+                      </span>
+                      <span className="text-sm text-gray-500">Status: {req.status}</span>
+                      <span className="text-xs text-gray-400">
+                        Requested: {new Date(req.requested_at).toLocaleString()}
+                      </span>
+
+                      <div className="mt-2 flex space-x-2">
+                        <button
+                          className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
+                          onClick={() => handleDecision(req, true)}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+                          onClick={() => {
+                            if (
+                              window.confirm("Are you sure you want to reject this request?")
+                            ) {
+                              handleDecision(req, false);
+                            }
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Outgoing Requests */}
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-blue-700 mb-4">Outgoing Requests</h2>
+              <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
+                {outgoingRequests.length === 0 ? (
+                  <p className="text-gray-500">No outgoing requests.</p>
+                ) : (
+                  outgoingRequests.map((req) => (
+                    <div key={req.id} className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm">
+                      <span className="font-medium text-gray-700">
+                        {req.equipment?.name || "Unknown Equipment"}
+                      </span>
+                      <span className="text-sm text-gray-500">Quantity: {req.quantity ?? "N/A"}</span>
+                      <span className="text-sm text-gray-500">
+                        To: {req.to_site?.site_name || "Unknown Site"}
+                      </span>
+                      <span className="text-sm text-gray-500">Status: {req.status}</span>
+                      <span className="text-xs text-gray-400">
+                        Requested: {new Date(req.requested_at).toLocaleString()}
+                      </span>
+
+                      {req.status === "pending" && (
+                        <div className="mt-2">
+                          <button
+                            className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+                            onClick={() => {
+                              if (window.confirm("Are you sure you want to cancel this transfer?")) {
+                                handleCancelTransfer(req);
+                              }
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500">Please select a construction site to view its data.</p>
+          </div>
+        )}
       </div>
     </div>
   );

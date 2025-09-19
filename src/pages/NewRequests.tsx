@@ -7,75 +7,57 @@ const NewRequests: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const [fromSites, setFromSites] = useState<{ id: string; site_name: string }[]>([]);
   const [fromSiteId, setFromSiteId] = useState<string>("");
-  const [fromSiteName, setFromSiteName] = useState<string>("");
   const [toSites, setToSites] = useState<{ id: string; site_name: string }[]>([]);
   const [toSiteId, setToSiteId] = useState<string>("");
 
-  const [equipmentList, setEquipmentList] = useState<
-    { id: number; name: string; total: number }[]
-  >([]);
+  const [equipmentList, setEquipmentList] = useState<{ id: number; name: string; total: number }[]>([]);
   const [selectedEquipment, setSelectedEquipment] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
   const [maxQuantity, setMaxQuantity] = useState<number>(1);
 
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Fetch logged-in user's site_id -> site_name
+  // Fetch all sites for the supervisor
   useEffect(() => {
-    const fetchUserSite = async () => {
+    const fetchSupervisorSites = async () => {
       if (!user) return;
 
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("site_id")
-        .eq("id", user.id)
-        .single();
-
-      if (userError || !userData) {
-        console.error("Error fetching user site:", userError);
-        return;
-      }
-
-      const siteId = userData.site_id;
-      setFromSiteId(siteId);
-
-      const { data: siteData, error: siteError } = await supabase
+      const { data: sitesData, error } = await supabase
         .from("construction_sites")
-        .select("site_name")
-        .eq("id", siteId)
-        .single();
+        .select("id, site_name")
+        .eq("supervisor_id", user.id);
 
-      if (siteError || !siteData) {
-        console.error("Error fetching site name:", siteError);
+      if (error) {
+        console.error("Error fetching supervisor sites:", error);
         return;
       }
 
-      setFromSiteName(siteData.site_name);
+      if (sitesData && sitesData.length > 0) {
+        setFromSites(sitesData);
+        setFromSiteId(sitesData[0].id); // default selection
+      }
     };
 
-    fetchUserSite();
+    fetchSupervisorSites();
   }, [user]);
 
-  // Fetch all construction sites
+  // Fetch all construction sites for "To Site"
   useEffect(() => {
     const fetchSites = async () => {
-      const { data, error } = await supabase
-        .from("construction_sites")
-        .select("id, site_name");
-
+      const { data, error } = await supabase.from("construction_sites").select("id, site_name");
       if (error) {
         console.error("Error fetching sites:", error);
         return;
       }
-
       setToSites(data || []);
     };
 
     fetchSites();
   }, []);
 
-  // Fetch equipment for user's site and group by name
+  // Fetch equipment for selected "From Site"
   useEffect(() => {
     if (!fromSiteId) return;
 
@@ -90,12 +72,9 @@ const NewRequests: React.FC = () => {
         return;
       }
 
-      // ✅ Group by name and keep the first id
       const grouped: Record<string, { id: number; total: number }> = {};
       (data || []).forEach((eq) => {
-        if (!grouped[eq.name]) {
-          grouped[eq.name] = { id: eq.id, total: 0 };
-        }
+        if (!grouped[eq.name]) grouped[eq.name] = { id: eq.id, total: 0 };
         grouped[eq.name].total += eq.quantity || 0;
       });
 
@@ -119,24 +98,20 @@ const NewRequests: React.FC = () => {
       return;
     }
 
-    const selected = equipmentList.find(
-      (eq) => eq.id.toString() === selectedEquipment
-    );
+    const selected = equipmentList.find((eq) => eq.id.toString() === selectedEquipment);
     if (selected) {
       setMaxQuantity(selected.total);
       if (quantity > selected.total) setQuantity(selected.total);
     }
   }, [selectedEquipment, equipmentList]);
 
-  // Handle submit
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fromSiteId || !user?.id || !selectedEquipment || !toSiteId || quantity <= 0)
-      return;
+    if (!fromSiteId || !user?.id || !selectedEquipment || !toSiteId || quantity <= 0) return;
 
     setLoading(true);
 
-    // ✅ Insert transfer request using equipment_id
     const { error } = await supabase.from("equipment_transfers").insert([
       {
         equipment_id: Number(selectedEquipment),
@@ -144,7 +119,7 @@ const NewRequests: React.FC = () => {
         to_site_id: toSiteId,
         requested_by: user.id,
         status: "pending",
-        quantity: quantity,
+        quantity,
       },
     ]);
 
@@ -159,12 +134,12 @@ const NewRequests: React.FC = () => {
     }
   };
 
-  if (!fromSiteId) {
+  if (fromSites.length === 0) {
     return (
       <div className="p-6 max-w-lg mx-auto bg-white shadow-md rounded-xl">
         <h1 className="text-xl font-bold mb-4">New Tool Transfer</h1>
         <p className="text-red-600">
-          You are not assigned to a site. Please contact an administrator.
+          You are not assigned as a supervisor for any site. Please contact an administrator.
         </p>
       </div>
     );
@@ -175,22 +150,25 @@ const NewRequests: React.FC = () => {
       <h1 className="text-xl font-bold mb-4">New Tool Transfer</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* From Site */}
+        {/* From Site Dropdown */}
         <div>
           <label className="block text-sm font-medium mb-1">From Site</label>
-          <input
-            type="text"
-            value={fromSiteName}
-            disabled
-            className="w-full border rounded-lg p-2 bg-gray-100"
-          />
+          <select
+            value={fromSiteId}
+            onChange={(e) => setFromSiteId(e.target.value)}
+            className="w-full border rounded-lg p-2"
+          >
+            {fromSites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.site_name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Equipment Dropdown */}
         <div>
-          <label className="block text-sm font-medium mb-1">
-            Equipment to Transfer
-          </label>
+          <label className="block text-sm font-medium mb-1">Equipment to Transfer</label>
           <select
             value={selectedEquipment}
             onChange={(e) => setSelectedEquipment(e.target.value)}
@@ -208,15 +186,11 @@ const NewRequests: React.FC = () => {
 
         {/* Quantity Input */}
         <div>
-          <label className="block text-sm font-medium mb-1">
-            Quantity (Max: {maxQuantity})
-          </label>
+          <label className="block text-sm font-medium mb-1">Quantity (Max: {maxQuantity})</label>
           <input
             type="number"
             value={quantity}
-            onChange={(e) =>
-              setQuantity(Math.min(Number(e.target.value), maxQuantity))
-            }
+            onChange={(e) => setQuantity(Math.min(Number(e.target.value), maxQuantity))}
             min={1}
             max={maxQuantity}
             required
@@ -224,7 +198,7 @@ const NewRequests: React.FC = () => {
           />
         </div>
 
-        {/* To Site */}
+        {/* To Site Dropdown */}
         <div>
           <label className="block text-sm font-medium mb-1">To Site</label>
           <select
@@ -234,13 +208,11 @@ const NewRequests: React.FC = () => {
             className="w-full border rounded-lg p-2"
           >
             <option value="">Select a site</option>
-            {toSites
-              .filter((site) => site.id !== fromSiteId)
-              .map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.site_name}
-                </option>
-              ))}
+            {toSites.filter((site) => site.id !== fromSiteId).map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.site_name}
+              </option>
+            ))}
           </select>
         </div>
 
