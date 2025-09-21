@@ -3,17 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { supabase } from '../lib/supabase.ts';
 
+interface Profile {
+  username: string;
+  phone: string;
+  role?: 'admin' | 'supervisor';
+}
+
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<{ username: string; phone: string; role?: string } | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [redirected, setRedirected] = useState(false);
 
-  // Check if user has profile info and role
+  // Fetch user profile
   useEffect(() => {
     const fetchProfile = async () => {
       if (!user || redirected) return;
@@ -38,71 +45,83 @@ const HomePage: React.FC = () => {
           setUsername(data.username || '');
           setPhone(data.phone || '');
         } else {
-          // Complete profile, check role and redirect
+          // Complete profile → redirect based on role
           setRedirected(true);
           const destination = data.role === 'admin' ? '/admin' : '/supervisor';
-          navigate(destination);
+          navigate(destination, { replace: true });
         }
       } catch (err) {
-        console.error('Unexpected error:', err);
+        console.error('Unexpected error fetching profile:', err);
         setError('An unexpected error occurred');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchProfile();
   }, [user, navigate, redirected]);
 
+  // Submit profile update
   const handleProfileSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (!username || !phone) {
-      setError('Please fill in both fields.');
+  e.preventDefault();
+  setError('');
+
+  if (!user?.id || !user?.email) {
+    setError('User not found');
+    return;
+  }
+
+  if (!username || !phone) {
+    setError('Please fill in both fields.');
+    return;
+  }
+
+  try {
+    const { data: upsertedData, error: upsertError } = await supabase
+      .from('users')
+      .upsert(
+        {
+          id: user.id,
+          email: user.email,
+          username,
+          phone,
+          role: 'supervisor', // default for new users
+        },
+        { onConflict: 'id', returning: 'representation' }
+      );
+
+    if (upsertError) {
+      setError(upsertError.message);
       return;
     }
 
-    try {
-      const { error: updateError } = await supabase
-        .from('users')
-        .upsert({ id: user?.id, username, phone })
-        .eq('id', user?.id);
+    // Immediately update local profile state
+    const savedProfile = upsertedData?.[0];
+    setProfile(savedProfile);
 
-      if (updateError) {
-        setError(updateError.message);
-        return;
-      }
+    // Redirect based on role
+    const destination = savedProfile?.role === 'admin' ? '/admin' : '/supervisor';
+    navigate(destination, { replace: true });
+  } catch (err) {
+    console.error('Unexpected error on profile submit:', err);
+    setError('An unexpected error occurred');
+  }
+};
 
-      // After saving profile, fetch role to determine redirect
-      const { data, error: fetchError } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user?.id)
-        .single();
-
-      if (fetchError) {
-        setError(fetchError.message);
-        return;
-      }
-
-      const destination = data.role === 'admin' ? '/admin' : '/supervisor';
-      navigate(destination);
-    } catch (err) {
-      setError('An unexpected error occurred');
-    }
-  };
-
+  // Manual logout
   const handleLogout = async () => {
     try {
-      const { error } = await signOut();
-      if (!error) navigate('/login');
+      await signOut();
+      navigate('/login', { replace: true });
     } catch (err) {
+      console.error('Logout failed:', err);
       setError('Failed to log out');
     }
   };
 
   if (loading) return <p className="p-6">Loading...</p>;
 
-  // If profile is incomplete, show form
+  // Show profile form if incomplete
   if (!profile || !profile.username || !profile.phone) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
@@ -144,7 +163,7 @@ const HomePage: React.FC = () => {
     );
   }
 
-  // Fallback
+  // Fallback (should rarely appear)
   return <p>Redirecting...</p>;
 };
 
