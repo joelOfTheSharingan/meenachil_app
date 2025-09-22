@@ -26,29 +26,24 @@ const HomePage: React.FC = () => {
       if (!user || redirected) return;
 
       try {
-        const { data, error } = await supabase
+        const { data, error: fetchError } = await supabase
           .from('users')
           .select('username, phone, role')
           .eq('id', user.id)
           .single();
 
-        if (error) {
-          console.error('Error fetching profile:', error.message);
-          setError('Failed to fetch profile');
-          setLoading(false);
-          return;
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          throw fetchError;
         }
 
-        setProfile(data);
-        if (!data.username || !data.phone) {
-          // Incomplete profile
-          setUsername(data.username || '');
-          setPhone(data.phone || '');
-        } else {
-          // Complete profile → redirect based on role
+        if (data && data.username && data.phone) {
+          // Profile complete → redirect based on role
           setRedirected(true);
           const destination = data.role === 'admin' ? '/admin' : '/supervisor';
           navigate(destination, { replace: true });
+        } else {
+          setUsername(data?.username || '');
+          setPhone(data?.phone || '');
         }
       } catch (err) {
         console.error('Unexpected error fetching profile:', err);
@@ -63,50 +58,50 @@ const HomePage: React.FC = () => {
 
   // Submit profile update
   const handleProfileSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError('');
+    e.preventDefault();
+    setError('');
 
-  if (!user?.id || !user?.email) {
-    setError('User not found');
-    return;
-  }
-
-  if (!username || !phone) {
-    setError('Please fill in both fields.');
-    return;
-  }
-
-  try {
-    const { data: upsertedData, error: upsertError } = await supabase
-      .from('users')
-      .upsert(
-        {
-          id: user.id,
-          email: user.email,
-          username,
-          phone,
-          role: 'supervisor', // default for new users
-        },
-        { onConflict: 'id', returning: 'representation' }
-      );
-
-    if (upsertError) {
-      setError(upsertError.message);
+    if (!user?.id || !user?.email) {
+      setError('User not found');
       return;
     }
 
-    // Immediately update local profile state
-    const savedProfile = upsertedData?.[0];
-    setProfile(savedProfile);
+    if (!username || !phone) {
+      setError('Please fill in both fields.');
+      return;
+    }
 
-    // Redirect based on role
-    const destination = savedProfile?.role === 'admin' ? '/admin' : '/supervisor';
-    navigate(destination, { replace: true });
-  } catch (err) {
-    console.error('Unexpected error on profile submit:', err);
-    setError('An unexpected error occurred');
-  }
-};
+    try {
+      const { data: upsertedData, error: upsertError } = await supabase
+        .from('users')
+        .upsert(
+          {
+            id: user.id,
+            email: user.email,
+            username,
+            phone,
+            role: 'supervisor', // default for new users
+          },
+          { onConflict: 'id', returning: 'representation' }
+        );
+
+      if (upsertError) {
+        setError(upsertError.message);
+        return;
+      }
+
+      // Immediately update local profile state
+      const savedProfile = upsertedData?.[0];
+      setProfile(savedProfile);
+
+      // Redirect based on role
+      const destination = savedProfile?.role === 'admin' ? '/admin' : '/supervisor';
+      navigate(destination, { replace: true });
+    } catch (err) {
+      console.error('Unexpected error on profile submit:', err);
+      setError('An unexpected error occurred');
+    }
+  };
 
   // Manual logout
   const handleLogout = async () => {
@@ -125,36 +120,40 @@ const HomePage: React.FC = () => {
   if (!profile || !profile.username || !profile.phone) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-        <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-          <h2 className="text-2xl font-semibold text-center mb-6">
-            Complete Your Profile
-          </h2>
-          {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+        <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-md">
+          <h1 className="text-xl font-bold mb-4">Complete Your Profile</h1>
+          {error && <p className="text-red-600 mb-2">{error}</p>}
           <form onSubmit={handleProfileSubmit} className="space-y-4">
-            <input
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="tel"
-              placeholder="Phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div>
+              <label className="block text-sm font-medium mb-1">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full border rounded p-2"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Phone</label>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full border rounded p-2"
+                required
+              />
+            </div>
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition duration-200"
+              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
             >
               Save & Continue
             </button>
           </form>
           <button
             onClick={handleLogout}
-            className="w-full mt-4 bg-red-600 text-white py-2 rounded-md hover:bg-red-700 transition duration-200"
+            className="mt-4 w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600"
           >
             Logout
           </button>

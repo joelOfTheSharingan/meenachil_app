@@ -10,6 +10,8 @@ import SupervisorDashboard from './pages/SupervisorDashboard.tsx'
 import MySiteTools from './pages/MySiteTools.tsx'
 import AllInventoryPage from './pages/AllInventory.tsx'
 import NewRequestsPage from './pages/NewRequests.tsx'   // ✅ new page import
+import UserManagement from './pages/Users.tsx'          // ✅ User Management page
+import AssignSites from './pages/AssignSites.tsx'       // ✅ Assign Sites page
 
 // ✅ Loader component
 const Loader: React.FC = () => (
@@ -104,6 +106,26 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute allowedRoles={['supervisor']}>
             <NewRequestsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ User Management page (admin only) */}
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <UserManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ Assign Sites page (admin only) */}
+      <Route
+        path="/assign-sites"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AssignSites />
           </ProtectedRoute>
         }
       />
