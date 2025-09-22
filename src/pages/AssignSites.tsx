@@ -4,6 +4,12 @@ import { supabase } from "../lib/supabase.ts";
 interface Site {
   id: string;
   site_name: string;
+  supervisor_id?: string | null;
+  supervisor?: {
+    id: string;
+    username: string;
+    email: string;
+  } | null;
 }
 
 interface Supervisor {
@@ -19,36 +25,35 @@ export default function AssignSites() {
   const [selectedSupervisor, setSelectedSupervisor] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  // Fetch all construction sites
-  useEffect(() => {
-    const fetchSites = async () => {
-      const { data, error } = await supabase
-        .from("construction_sites")
-        .select("id, site_name");
+  // Fetch all construction sites (with assigned supervisors)
+  const fetchSites = async () => {
+    const { data, error } = await supabase
+      .from("construction_sites")
+      .select("id, site_name, supervisor_id, supervisor:supervisor_id (id, username, email)");
 
-      if (error) {
-        console.error("Error fetching sites:", error);
-        return;
-      }
-      setSites(data || []);
-    };
+    if (error) {
+      console.error("Error fetching sites:", error);
+      return;
+    }
+    setSites(data || []);
+  };
+
+  // Fetch supervisors list
+  const fetchSupervisors = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, username, email")
+      .eq("role", "supervisor");
+
+    if (error) {
+      console.error("Error fetching supervisors:", error);
+      return;
+    }
+    setSupervisors(data || []);
+  };
+
+  useEffect(() => {
     fetchSites();
-  }, []);
-
-  // Fetch all supervisors
-  useEffect(() => {
-    const fetchSupervisors = async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("id, username, email")
-        .eq("role", "supervisor");
-
-      if (error) {
-        console.error("Error fetching supervisors:", error);
-        return;
-      }
-      setSupervisors(data || []);
-    };
     fetchSupervisors();
   }, []);
 
@@ -73,14 +78,15 @@ export default function AssignSites() {
       alert("✅ Supervisor assigned successfully!");
       setSelectedSite("");
       setSelectedSupervisor("");
+      fetchSites(); // refresh list immediately
     }
   };
 
   return (
-    <div className="p-6 max-w-lg mx-auto bg-white shadow-md rounded-xl">
+    <div className="p-6 max-w-2xl mx-auto bg-white shadow-md rounded-xl">
       <h1 className="text-2xl font-bold mb-6">Assign Supervisors to Sites</h1>
 
-      <form onSubmit={handleAssign} className="space-y-4">
+      <form onSubmit={handleAssign} className="space-y-4 mb-8">
         {/* Site Dropdown */}
         <div>
           <label className="block text-sm font-medium mb-1">Select Site</label>
@@ -101,9 +107,7 @@ export default function AssignSites() {
 
         {/* Supervisor Dropdown */}
         <div>
-          <label className="block text-sm font-medium mb-1">
-            Select Supervisor
-          </label>
+          <label className="block text-sm font-medium mb-1">Select Supervisor</label>
           <select
             value={selectedSupervisor}
             onChange={(e) => setSelectedSupervisor(e.target.value)}
@@ -127,6 +131,34 @@ export default function AssignSites() {
           {loading ? "Assigning..." : "Assign Supervisor"}
         </button>
       </form>
+
+      {/* Current Site Assignments */}
+      {/* Current Site Assignments */}
+<div>
+  <h2 className="text-xl font-semibold mb-4">Current Site Assignments</h2>
+  {sites.length === 0 ? (
+    <p className="text-gray-500">No sites available.</p>
+  ) : (
+    <ul className="space-y-3">
+      {sites.map((site) => (
+        <li
+          key={site.id}
+          className="p-4 border rounded-lg bg-gray-50 flex justify-between"
+        >
+          <span className="font-medium">{site.site_name}</span>
+          <span className="text-sm text-gray-600">
+            {site.supervisor
+              ? site.supervisor.username
+                ? site.supervisor.username
+                : site.supervisor.email
+              : "Unassigned"}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )}
+</div>
+
     </div>
   );
 }

@@ -9,6 +9,12 @@ interface Equipment {
   name: string;
   site_id: string | null;
   quantity: number;
+  construction_sites?: { site_name: string };
+}
+
+interface Site {
+  id: string;
+  site_name: string;
 }
 
 interface GroupedEquipment {
@@ -22,26 +28,36 @@ interface GroupedEquipment {
 const AllEquipment: React.FC = () => {
   const { userRole } = useAuth();
   const [equipment, setEquipment] = useState<GroupedEquipment[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ totalQuantity: 1 });
+  const [editingAll, setEditingAll] = useState(false);
+  const [editForms, setEditForms] = useState<Record<number, { quantity: number; site_id: string | null }>>({});
   const navigate = useNavigate();
 
   const fetchEquipment = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    // Fetch all equipment with site name
+    const { data: eqData, error: eqError } = await supabase
       .from("equipment")
       .select("id, name, site_id, quantity, construction_sites(site_name)");
 
-    if (error) {
-      console.error("Error fetching equipment:", error);
+    if (eqError) {
+      console.error("Error fetching equipment:", eqError);
       setLoading(false);
       return;
     }
 
-    const grouped: Record<string, GroupedEquipment> = {};
+    // Fetch all sites
+    const { data: sitesData, error: sitesError } = await supabase
+      .from("construction_sites")
+      .select("id, site_name");
 
-    (data || []).forEach((eq) => {
+    if (sitesError) console.error("Error fetching sites:", sitesError);
+    setSites(sitesData || []);
+
+    const grouped: Record<string, GroupedEquipment> = {};
+    (eqData || []).forEach((eq) => {
       const key = `${eq.name}-${eq.site_id || "null"}`;
       if (!grouped[key]) {
         grouped[key] = {
@@ -65,27 +81,33 @@ const AllEquipment: React.FC = () => {
     fetchEquipment();
   }, []);
 
-  const handleEditClick = (eq: GroupedEquipment, index: number) => {
-    setEditingIndex(index);
-    setEditForm({ totalQuantity: eq.totalQuantity });
+  const handleEditAllToggle = () => {
+    const initialForm: Record<number, { quantity: number; site_id: string | null }> = {};
+    equipment.forEach((eq, idx) => {
+      initialForm[idx] = { quantity: eq.totalQuantity, site_id: eq.site_id };
+    });
+    setEditForms(initialForm);
+    setEditingAll(!editingAll);
   };
 
-  const handleSaveEdit = async (eq: GroupedEquipment) => {
-    const diff = editForm.totalQuantity - eq.totalQuantity;
+  const handleSaveAll = async () => {
+    for (const [idx, form] of Object.entries(editForms)) {
+      const index = parseInt(idx);
+      const eq = equipment[index];
 
-    if (diff > 0) {
-      const newRows = Array.from({ length: diff }, () => ({
-        name: eq.name,
-        site_id: eq.site_id,
-        quantity: 1,
-      }));
-      await supabase.from("equipment").insert(newRows);
-    } else if (diff < 0) {
-      const idsToDelete = eq.ids.slice(0, -diff);
-      await supabase.from("equipment").delete().in("id", idsToDelete);
+      // Update quantity for all IDs
+      const perRowQty = Math.floor(form.quantity / eq.ids.length);
+      const remainder = form.quantity % eq.ids.length;
+      for (let i = 0; i < eq.ids.length; i++) {
+        const qtyToSet = i === 0 ? perRowQty + remainder : perRowQty;
+        await supabase
+          .from("equipment")
+          .update({ quantity: qtyToSet, site_id: form.site_id })
+          .eq("id", eq.ids[i]);
+      }
     }
 
-    setEditingIndex(null);
+    setEditingAll(false);
     await fetchEquipment();
   };
 
@@ -98,81 +120,83 @@ const AllEquipment: React.FC = () => {
 
   return (
     <div className="p-4">
-      <nav className="flex justify-between items-center bg-gray-800 text-white px-4 py-2 rounded-lg mb-4">
+      <nav className="flex flex-col sm:flex-row justify-between items-center bg-gray-800 text-white px-4 py-2 rounded-lg mb-4 gap-2 sm:gap-0">
         <h1 className="text-xl font-bold">All Equipment</h1>
-        <Button onClick={() => navigate("/supervisor")} className="bg-blue-600 hover:bg-blue-700">
-          Go to Home
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => navigate("/supervisor")} className="bg-blue-600 hover:bg-blue-700">
+            Go to Home
+          </Button>
+          <Button onClick={handleEditAllToggle} className="bg-yellow-500 hover:bg-yellow-600">
+            {editingAll ? "Cancel Edit" : "Edit"}
+          </Button>
+          {editingAll && (
+            <Button onClick={handleSaveAll} className="bg-green-600 hover:bg-green-700">
+              Save All
+            </Button>
+          )}
+        </div>
       </nav>
 
       <div className="overflow-x-auto">
-  <div className="transform origin-top-left scale-60">
-    <table className="w-full min-w-[500px] border border-gray-300 rounded-lg">
-      <thead className="bg-gray-100">
-        <tr>
-          <th className="border px-4 py-2 text-left">Name</th>
-          <th className="border px-4 py-2 text-left">Site</th>
-          <th className="border px-4 py-2 text-left w-24">Total Quantity</th>
-          <th className="border px-4 py-2 text-left">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {equipment.map((eq, index) => (
-          <React.Fragment key={index}>
-            <tr>
-              <td className="border px-4 py-2">{eq.name}</td>
-              <td className="border px-4 py-2">{eq.site_name}</td>
-              <td className="border px-4 py-2 w-24">{eq.totalQuantity}</td>
-              <td className="border px-4 py-2 space-x-2">
-                <Button onClick={() => handleEditClick(eq, index)}>Edit</Button>
-                {userRole === "admin" && (
-                  <Button variant="outline" className="text-red-600" onClick={() => handleDelete(eq)}>
-                    Remove
-                  </Button>
-                )}
-              </td>
-            </tr>
+        <table className="min-w-full border border-gray-300 rounded-lg">
+          <thead className="bg-gray-100">
+  <tr>
+    <th className="border px-4 py-2 text-left">Name</th>
+    <th className="border px-4 py-2 text-left">Site</th>
+    <th className="border px-4 py-2 text-left w-24">Quantity</th>
+  </tr>
+</thead>
+<tbody>
+  {equipment.map((eq, index) => (
+    <tr key={index}>
+      <td className="border px-4 py-2">{eq.name}</td>
+      <td className="border px-4 py-2">
+        {editingAll ? (
+          <select
+            value={editForms[index].site_id || ""}
+            onChange={(e) =>
+              setEditForms({
+                ...editForms,
+                [index]: { ...editForms[index], site_id: e.target.value },
+              })
+            }
+            className="border px-2 py-1 rounded w-full"
+          >
+            <option value="">Not Assigned</option>
+            {sites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.site_name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          eq.site_name
+        )}
+      </td>
+      <td className="border px-4 py-2 w-24">
+        {editingAll ? (
+          <input
+            type="number"
+            min={1}
+            value={editForms[index].quantity}
+            onChange={(e) =>
+              setEditForms({
+                ...editForms,
+                [index]: { ...editForms[index], quantity: Math.max(1, parseInt(e.target.value) || 1) },
+              })
+            }
+            className="border px-2 py-1 rounded w-full"
+          />
+        ) : (
+          eq.totalQuantity
+        )}
+      </td>
+    </tr>
+  ))}
+</tbody>
 
-            {editingIndex === index && (
-              <tr>
-                <td colSpan={4} className="border px-4 py-4 bg-gray-50">
-                  <div className="space-y-3">
-                    <input
-                      type="number"
-                      min={1}
-                      value={editForm.totalQuantity}
-                      onChange={(e) =>
-                        setEditForm({ totalQuantity: Math.max(1, parseInt(e.target.value) || 1) })
-                      }
-                      className="border px-2 py-1 rounded w-full"
-                    />
-                    <div className="flex space-x-2">
-                      <Button onClick={() => handleSaveEdit(eq)}>Save</Button>
-                      <Button variant="outline" onClick={() => setEditingIndex(null)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            )}
-          </React.Fragment>
-        ))}
-
-        {/* Total Row */}
-        <tr className="bg-gray-200 font-bold">
-          <td colSpan={2} className="border px-4 py-2 text-right">
-            Total Quantity:
-          </td>
-          <td className="border px-4 py-2 w-24">
-            {equipment.reduce((sum, eq) => sum + eq.totalQuantity, 0)}
-          </td>
-          <td className="border px-4 py-2"></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
+        </table>
+      </div>
     </div>
   );
 };

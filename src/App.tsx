@@ -9,9 +9,10 @@ import AdminDashboard from './pages/AdminDashboard.tsx'
 import SupervisorDashboard from './pages/SupervisorDashboard.tsx'
 import MySiteTools from './pages/MySiteTools.tsx'
 import AllInventoryPage from './pages/AllInventory.tsx'
-import NewRequestsPage from './pages/NewRequests.tsx'   // ✅ new page import
-import UserManagement from './pages/Users.tsx'          // ✅ User Management page
-import AssignSites from './pages/AssignSites.tsx'       // ✅ Assign Sites page
+import NewRequestsPage from './pages/NewRequests.tsx'   
+import UserManagement from './pages/Users.tsx'
+import AssignSites from './pages/AssignSites.tsx'
+import TransactionLogs from './pages/TransactionLogs.tsx'
 
 // ✅ Loader component
 const Loader: React.FC = () => (
@@ -126,6 +127,16 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AssignSites />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ Transaction Logs page (admin only) */}
+      <Route
+        path="/transactions"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <TransactionLogs />
           </ProtectedRoute>
         }
       />
