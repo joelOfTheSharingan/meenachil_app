@@ -7,39 +7,42 @@ export default function AdminDashboard() {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
-      navigate("/login");
-    } catch (error) {
-      console.error("Error logging out:", error);
+      // Get current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error("Error getting session:", sessionError.message);
+        return;
+      }
+
+      if (!session) {
+        console.warn("No active session to log out");
+      } else {
+        // Sign out
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error("Logout failed:", error.message);
+        } else {
+          console.log("Logged out successfully");
+        }
+      }
+
+      // Redirect user to login/home page regardless
+      navigate("/login"); // or use "/" if that’s your home route
+    } catch (err: any) {
+      console.error("Unexpected logout error:", err.message);
+      navigate("/login"); // fallback redirect
     }
   };
 
   // Shared button base styles
-  const baseBtn =
-    "text-white font-semibold px-4 py-2 rounded-lg transition duration-300";
+  const baseBtn = "text-white font-semibold px-4 py-2 rounded-lg transition duration-300";
 
   // Navigation buttons configuration
   const navButtons = [
-    {
-      label: "See All Equipment",
-      path: "/inventory",
-      color: "bg-blue-500 hover:bg-blue-600",
-    },
-    {
-      label: "Manage Users",
-      path: "/users",
-      color: "bg-green-500 hover:bg-green-600",
-    },
-    {
-      label: "Manage Sites",
-      path: "/assign-sites",
-      color: "bg-yellow-500 hover:bg-yellow-600",
-    },
-    {
-      label: "Transaction Logs",
-      path: "/transactions",
-      color: "bg-purple-500 hover:bg-purple-600",
-    },
+    { label: "See All Equipment", path: "/inventory", color: "bg-blue-500 hover:bg-blue-600" },
+    { label: "Manage Users", path: "/users", color: "bg-green-500 hover:bg-green-600" },
+    { label: "Manage Sites", path: "/assign-sites", color: "bg-yellow-500 hover:bg-yellow-600" },
+    { label: "Transaction Logs", path: "/transactions", color: "bg-purple-500 hover:bg-purple-600" },
   ];
 
   return (
