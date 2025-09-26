@@ -1,3 +1,4 @@
+// src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../lib/supabase.ts";
 import type { User } from "@supabase/supabase-js";
@@ -12,6 +13,7 @@ type AuthContextType = {
   signUp: (email: string, password: string, role?: Role) => Promise<{ error: any }>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  handleOAuthRedirect: (hash: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,7 +23,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ Ensure user row exists
   const ensureUserRow = async (authId: string, email: string, role: Role = "supervisor") => {
     try {
       const { data, error } = await supabase
@@ -46,10 +47,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // ✅ Fetch user row, fall back to auth user if table fails
   const fetchUser = async (authId: string, email: string) => {
     try {
-      // Add timeout for database operations
       const dbPromise = (async () => {
         await ensureUserRow(authId, email);
         const { data, error } = await supabase
@@ -57,11 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .select("*")
           .eq("auth_id", authId)
           .single();
-
-        if (error) {
-          console.warn("Database query failed, using fallback:", error.message);
-          return null;
-        }
+        if (error) return null;
         return data;
       })();
 
@@ -71,137 +66,96 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const data = await Promise.race([dbPromise, timeoutPromise]);
       
-      if (data) {
-        setUser(data);
-        console.log("✅ User data loaded from database");
-      } else {
-        console.warn("⚠️ Using fallback user data");
-        setUser({ id: authId, email, role: "supervisor" }); // fallback
-      }
+      if (data) setUser(data);
+      else setUser({ id: authId, email, role: "supervisor" });
     } catch (err) {
-      console.error("❌ fetchUser failed:", err);
-      if (err.message === 'Database timeout') {
-        console.warn("⚠️ Database slow, using fallback user data");
-        setUser({ id: authId, email, role: "supervisor" }); // fallback
-      } else {
-        setUser(null);
-      }
+      console.error("fetchUser failed:", err);
+      setUser({ id: authId, email, role: "supervisor" });
     }
   };
 
+  const handleOAuthRedirect = async (hash: string) => {
+  if (!hash) return;
+  const params = new URLSearchParams(hash.replace('#', ''));
+  const access_token = params.get('access_token');
+  const refresh_token = params.get('refresh_token');
+
+  if (!access_token || !refresh_token) {
+    console.warn("OAuth tokens missing in redirect hash");
+    return;
+  }
+
+  const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+  if (error) setError(error.message);
+  if (data.session?.user) {
+    await fetchUser(data.session.user.id, data.session.user.email!);
+  }
+};
+
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout;
 
     const init = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
-        setLoading(true);
-        setError(null);
-        
-        console.log("🔐 Starting auth initialization...");
-        
-        // Set a timeout to prevent infinite loading
-        timeoutId = setTimeout(() => {
-          if (mounted) {
-            console.warn("⏰ Auth initialization timeout - forcing loading to false");
-            setLoading(false);
-            setError("Authentication timeout - please refresh the page");
+        if (window.location.hash.includes('access_token')) {
+          await handleOAuthRedirect(window.location.hash);
+        } else {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user && mounted) {
+            await fetchUser(session.user.id, session.user.email!);
+          } else {
+            setUser(null);
           }
-        }, 15000); // Increased to 15 seconds
-
-        // Add timeout wrapper for getSession
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('getSession timeout')), 10000)
-        );
-        
-        const {
-          data: { session },
-        } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-
-        console.log("✅ Session retrieved:", session ? "User found" : "No user");
-
-        if (session?.user && mounted) {
-          console.log("👤 Fetching user data...");
-          await fetchUser(session.user.id, session.user.email!);
-        } else if (mounted) {
-          setUser(null);
         }
-      } catch (error) {
-        console.error("❌ Auth initialization error:", error);
+      } catch (err) {
+        console.error("Auth initialization error:", err);
         if (mounted) {
           setUser(null);
-          if (error.message === 'getSession timeout') {
-            setError("Authentication service is slow - please refresh");
-          } else {
-            setError("Failed to initialize authentication");
-          }
+          setError("Failed to initialize authentication");
         }
       } finally {
-        if (mounted) {
-          clearTimeout(timeoutId);
-          setLoading(false);
-          console.log("🏁 Auth initialization complete");
-        }
+        if (mounted) setLoading(false);
       }
     };
 
     init();
 
-    // ✅ Subscribe to auth changes
-    const { data: subscription } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
-        
-        try {
-          if (session?.user) {
-            await fetchUser(session.user.id, session.user.email!);
-          } else {
-            setUser(null);
-          }
-        } catch (error) {
-          console.error("Auth state change error:", error);
-          setUser(null);
-          setError("Authentication error occurred");
-        }
-        // Don't set loading to false here - only in init()
-      }
-    );
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      if (session?.user) await fetchUser(session.user.id, session.user.email!);
+      else setUser(null);
+    });
 
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
       subscription?.subscription?.unsubscribe?.();
     };
   }, []);
 
-  // ✅ Auth actions
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (!error && data.user) {
-      await ensureUserRow(data.user.id, email);
-    }
+    if (!error && data.user) await ensureUserRow(data.user.id, email);
     return { error };
   };
 
   const signUp = async (email: string, password: string, role: Role = "supervisor") => {
     const { data, error } = await supabase.auth.signUp({ email, password });
-    if (!error && data.user) {
-      await ensureUserRow(data.user.id, email, role);
-    }
+    if (!error && data.user) await ensureUserRow(data.user.id, email, role);
     return { error };
   };
 
   const signInWithGoogle = async () => {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      // Send user back to app root; HashRouter will route based on session
-      redirectTo: `${window.location.origin}/meenachil_app/#/`,
-    },
-  });
-  if (error) throw error;
-};
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/meenachil_app/#/`,
+      },
+    });
+    if (error) throw error;
+  };
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -211,7 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, error, signIn, signUp, signInWithGoogle, signOut }}
+      value={{ user, loading, error, signIn, signUp, signInWithGoogle, signOut, handleOAuthRedirect }}
     >
       {children}
     </AuthContext.Provider>
@@ -223,3 +177,4 @@ export const useAuth = () => {
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 
@@ -8,31 +8,40 @@ const SignUpPage: React.FC = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const { signUp, signInWithGoogle } = useAuth()
+  const { signUp, signInWithGoogle, handleOAuthRedirect } = useAuth()
   const navigate = useNavigate()
+
+  // ✅ Handle OAuth redirect token
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash.includes('access_token')) {
+      handleOAuthRedirect(hash)
+      navigate('/home', { replace: true })
+    }
+  }, [navigate, handleOAuthRedirect])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    // Default role is 'supervisor'
     const { error } = await signUp(email, password, 'supervisor')
     setLoading(false)
 
     if (error) {
       setError(error.message)
     } else {
-      navigate('/home') // SPA navigation
+      navigate('/home')
     }
   }
 
   const handleGoogleSignUp = async () => {
     try {
+      setError('')
       await signInWithGoogle()
-      navigate('/home')
+      // OAuth redirect will trigger useEffect
     } catch (err: any) {
-      setError(err.message || 'Google sign-in failed')
+      setError(err.message || 'Google sign-up failed')
     }
   }
 
