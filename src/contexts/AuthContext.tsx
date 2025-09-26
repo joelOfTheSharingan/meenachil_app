@@ -196,7 +196,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${window.location.origin}/meenachil_app/#/oauth/callback`,
+      // Send user back to app root; HashRouter will route based on session
+      redirectTo: `${window.location.origin}/meenachil_app/#/`,
     },
   });
   if (error) throw error;
