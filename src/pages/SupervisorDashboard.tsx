@@ -24,6 +24,7 @@ const Dashboard: React.FC = () => {
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   // Refresh incoming requests (to selected site)
@@ -161,7 +162,7 @@ const Dashboard: React.FC = () => {
       }
       if (!user) return;
 
-      setUserEmail(user.email);
+      setUserEmail(user.email || null);
 
       // Try fetching user row by auth_id first
       let { data: userRow, error: userDbError } = await supabase
@@ -331,56 +332,96 @@ const Dashboard: React.FC = () => {
   const selectedSite = userSites.find(site => site.id === selectedSiteId);
 
   return (
-    <div className="p-6">
-      <div className="bg-white shadow-lg rounded-xl p-6">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-4">
-            <button className="text-gray-600 focus:outline-none">
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M4 6h16M4 12h16M4 18h16"
-                ></path>
+    <div className="relative">
+      {/* Sidebar Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-50 ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-800">Menu</h2>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <Link to="/newRequests">
-              <button className="text-gray-600 focus:outline-none">
+          </div>
+          
+          <nav className="space-y-4">
+            <Link
+              to="/transactions"
+              className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-md transition-colors"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>See all past transactions</span>
+            </Link>
+            
+            <Link
+              to="/newRequests"
+              className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-md transition-colors"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+              <span>New Request</span>
+            </Link>
+          </nav>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="p-6">
+        <div className="bg-white shadow-lg rounded-xl p-6">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center space-x-4">
+              <button 
+                className="text-gray-600 focus:outline-none hover:text-gray-800 transition-colors"
+                onClick={() => setSidebarOpen(true)}
+              >
                 <svg
-                  className="w-6 h-6 transform -rotate-45"
+                  className="w-6 h-6"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path
-                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth="2"
+                    d="M4 6h16M4 12h16M4 18h16"
                   ></path>
                 </svg>
               </button>
-            </Link>
+              
+            </div>
+            <div className="flex justify-end items-center">
+              <span className="text-gray-600 text-sm mr-2 hidden sm:inline">
+                Signed in as <strong>{userEmail}</strong>
+              </span>
+              <button
+                onClick={handleLogout}
+                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium"
+              >
+                Log Out
+              </button>
+            </div>
           </div>
-          <div className="flex justify-end items-center">
-            <span className="text-gray-600 text-sm mr-2 hidden sm:inline">
-              Signed in as <strong>{userEmail}</strong>
-            </span>
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium"
-            >
-              Log Out
-            </button>
-          </div>
-        </div>
 
         {/* Site Selection Dropdown */}
         <div className="mb-6">
@@ -474,10 +515,9 @@ const Dashboard: React.FC = () => {
                           {req.equipment?.name || "Unknown Equipment"}
                         </span>
                         {req.equipment?.isRental && (
-                          <span className="text-white text-xs px-3 py-1 rounded-full border border-green-800 bg-green-500/70">
-                              Rental
+                          <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                            Rental
                           </span>
-
                         )}
                       </div>
                       <span className="text-sm text-gray-500">
@@ -570,6 +610,7 @@ const Dashboard: React.FC = () => {
             <p className="text-gray-500">Please select a construction site to view its data.</p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
