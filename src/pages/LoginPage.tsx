@@ -8,7 +8,7 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const { signIn, signInWithGoogle, user } = useAuth()
+  const { signIn, signInWithGoogle, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,15 +28,15 @@ const LoginPage: React.FC = () => {
     try {
       setError('')
       await signInWithGoogle()
-      // After OAuth completes, redirect will happen from useEffect
+      // Redirect happens automatically after OAuth
     } catch (err: any) {
       setError(err.message || 'Google sign-in failed')
     }
   }
 
-  // ✅ Redirect user based on role
+  // Redirect user based on role
   useEffect(() => {
-    if (user) {
+    if (!authLoading && user) {
       if (user.role === 'admin') {
         navigate('/admin')
       } else if (user.role === 'supervisor') {
@@ -45,7 +45,7 @@ const LoginPage: React.FC = () => {
         navigate('/unauthorized')
       }
     }
-  }, [user, navigate])
+  }, [user, authLoading, navigate])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
@@ -76,17 +76,18 @@ const LoginPage: React.FC = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || authLoading}
             className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition duration-200 disabled:opacity-50"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading || authLoading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
 
         <div className="mt-6">
           <button
             onClick={handleGoogleLogin}
-            className="w-full border border-gray-300 py-2 rounded-md flex items-center justify-center hover:bg-gray-100 transition duration-200"
+            disabled={authLoading}
+            className="w-full border border-gray-300 py-2 rounded-md flex items-center justify-center hover:bg-gray-100 transition duration-200 disabled:opacity-50"
           >
             <img
               src="https://www.svgrepo.com/show/355037/google.svg"
@@ -108,5 +109,6 @@ const LoginPage: React.FC = () => {
     </div>
   )
 }
+
 export default LoginPage
-export { LoginPage };
+export { LoginPage }
