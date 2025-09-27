@@ -131,11 +131,11 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* ✅ Transaction Logs page (admin only) */}
+      {/* ✅ Transaction Logs page (admin and supervisor) */}
       <Route
         path="/transactions"
         element={
-          <ProtectedRoute allowedRoles={['admin']}>
+          <ProtectedRoute allowedRoles={['admin', 'supervisor']}>
             <TransactionLogs />
           </ProtectedRoute>
         }

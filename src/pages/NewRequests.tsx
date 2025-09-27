@@ -151,7 +151,15 @@ const NewRequests: React.FC = () => {
   if (fromSites.length === 0) {
     return (
       <div className="p-6 max-w-lg mx-auto bg-white shadow-md rounded-xl">
-        <h1 className="text-xl font-bold mb-4">New Tool Transfer</h1>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-xl font-bold">New Tool Transfer</h1>
+          <button
+            onClick={() => navigate("/home")}
+            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition duration-300"
+          >
+            Home
+          </button>
+        </div>
         <p className="text-red-600">
           You are not assigned as a supervisor for any site. Please contact an administrator.
         </p>
@@ -161,7 +169,15 @@ const NewRequests: React.FC = () => {
 
   return (
     <div className="p-6 max-w-lg mx-auto bg-white shadow-md rounded-xl">
-      <h1 className="text-xl font-bold mb-4">New Tool Transfer</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-xl font-bold">New Tool Transfer</h1>
+        <button
+          onClick={() => navigate("/home")}
+          className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition duration-300"
+        >
+          Home
+        </button>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* From Site */}

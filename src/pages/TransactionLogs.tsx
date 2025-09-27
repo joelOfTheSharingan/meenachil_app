@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase.ts";
+import { useAuth } from "../contexts/AuthContext.tsx";
 
 interface TransactionLog {
   id: string;
@@ -18,12 +19,15 @@ export default function TransactionLogs() {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchLogs = async () => {
+      if (!user) return;
+      
       setLoading(true);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("equipment_transfers")
         .select(`
           id,
@@ -36,6 +40,35 @@ export default function TransactionLogs() {
           quantity,
           status
         `);
+
+      // If user is supervisor, filter by their sites
+      if (user.role === 'supervisor') {
+        // First, get all sites supervised by this user
+        const { data: userSites, error: sitesError } = await supabase
+          .from("construction_sites")
+          .select("id")
+          .eq("supervisor_id", user.id);
+
+        if (sitesError) {
+          console.error("Error fetching user sites:", sitesError);
+          setLoading(false);
+          return;
+        }
+
+        if (userSites && userSites.length > 0) {
+          const siteIds = userSites.map(site => site.id);
+          // Filter transactions where either from_site_id or to_site_id is in user's sites
+          query = query.or(`from_site_id.in.(${siteIds.join(',')}),to_site_id.in.(${siteIds.join(',')})`);
+        } else {
+          // User has no sites, show empty results
+          setLogs([]);
+          setLoading(false);
+          return;
+        }
+      }
+      // If user is admin, show all transactions (no additional filtering)
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching transaction logs:", error);
@@ -67,7 +100,7 @@ export default function TransactionLogs() {
     };
 
     fetchLogs();
-  }, []);
+  }, [user]);
 
   const getStatusClasses = (status: string) => {
     switch (status.toLowerCase()) {
@@ -86,7 +119,14 @@ export default function TransactionLogs() {
   return (
     <div className="p-4 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Transaction Logs</h1>
+        <h1 className="text-2xl font-bold">
+          Transaction Logs
+          {user?.role === 'supervisor' && (
+            <span className="text-sm font-normal text-gray-600 ml-2">
+              (Your Sites Only)
+            </span>
+          )}
+        </h1>
         <button
           onClick={() => navigate("/")}
           className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition duration-300"
