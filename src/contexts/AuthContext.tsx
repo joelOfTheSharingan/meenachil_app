@@ -193,12 +193,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
+  const redirectUrl = window.location.hostname.includes("github.io")
+    ? "https://joelofthesharingan.github.io/meenachil_app/#/"
+    : "http://localhost:3000/#/";
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${window.location.origin}/meenachil_app/#/`, // GitHub Pages root
+      redirectTo: redirectUrl,
     },
   });
+
   if (error) throw error;
 };
 
