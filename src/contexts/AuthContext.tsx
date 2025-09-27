@@ -49,7 +49,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ✅ Fetch user row, fall back to auth user if table fails
   const fetchUser = async (authId: string, email: string) => {
     try {
-      // Add timeout for database operations
       const dbPromise = (async () => {
         await ensureUserRow(authId, email);
         const { data, error } = await supabase
@@ -65,24 +64,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return data;
       })();
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database timeout')), 5000)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Database timeout")), 5000)
       );
 
       const data = await Promise.race([dbPromise, timeoutPromise]);
-      
+
       if (data) {
         setUser(data);
         console.log("✅ User data loaded from database");
       } else {
         console.warn("⚠️ Using fallback user data");
-        setUser({ id: authId, email, role: "supervisor" }); // fallback
+        setUser({ id: authId, email, role: "supervisor" });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("❌ fetchUser failed:", err);
-      if (err.message === 'Database timeout') {
+      if (err.message === "Database timeout") {
         console.warn("⚠️ Database slow, using fallback user data");
-        setUser({ id: authId, email, role: "supervisor" }); // fallback
+        setUser({ id: authId, email, role: "supervisor" });
       } else {
         setUser(null);
       }
@@ -93,31 +92,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
 
+    const handleOAuthRedirect = async () => {
+      const hash = window.location.hash;
+
+      if (hash.includes("access_token")) {
+        console.log("🔑 OAuth redirect detected:", hash);
+
+        const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+
+        if (error) {
+          console.error("OAuth session exchange failed:", error.message);
+        } else {
+          console.log("✅ Session restored from redirect");
+          // Clean up the URL to remove tokens
+          window.history.replaceState({}, document.title, window.location.pathname + "#/");
+        }
+      }
+    };
+
     const init = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
+        // 🔄 First handle redirect tokens if present
+        await handleOAuthRedirect();
+
         console.log("🔐 Starting auth initialization...");
-        
-        // Set a timeout to prevent infinite loading
+
         timeoutId = setTimeout(() => {
           if (mounted) {
             console.warn("⏰ Auth initialization timeout - forcing loading to false");
             setLoading(false);
             setError("Authentication timeout - please refresh the page");
           }
-        }, 15000); // Increased to 15 seconds
+        }, 15000);
 
-        // Add timeout wrapper for getSession
         const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('getSession timeout')), 10000)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("getSession timeout")), 10000)
         );
-        
+
         const {
           data: { session },
-        } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        } = (await Promise.race([sessionPromise, timeoutPromise])) as any;
 
         console.log("✅ Session retrieved:", session ? "User found" : "No user");
 
@@ -127,11 +145,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else if (mounted) {
           setUser(null);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("❌ Auth initialization error:", error);
         if (mounted) {
           setUser(null);
-          if (error.message === 'getSession timeout') {
+          if (error.message === "getSession timeout") {
             setError("Authentication service is slow - please refresh");
           } else {
             setError("Failed to initialize authentication");
@@ -148,11 +166,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     init();
 
-    // ✅ Subscribe to auth changes
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (!mounted) return;
-        
+
         try {
           if (session?.user) {
             await fetchUser(session.user.id, session.user.email!);
@@ -164,7 +181,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
           setError("Authentication error occurred");
         }
-        // Don't set loading to false here - only in init()
       }
     );
 
@@ -193,19 +209,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
-  const redirectUrl = window.location.hostname.includes("github.io")
-    ? "https://joelofthesharingan.github.io/meenachil_app/#/"
-    : "http://localhost:3000/#/";
+    const redirectUrl = window.location.hostname.includes("github.io")
+      ? "https://joelofthesharingan.github.io/meenachil_app/#/"
+      : "http://localhost:3000/#/";
 
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: redirectUrl,
-    },
-  });
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
 
-  if (error) throw error;
-};
+    if (error) throw error;
+  };
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
