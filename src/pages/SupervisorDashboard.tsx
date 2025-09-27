@@ -152,57 +152,63 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    const fetchUserAndEquipment = async () => {
-      try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-        if (userError) {
-          console.error("Error fetching user:", userError.message);
-          return;
-        }
-        if (!user) return;
+  const fetchUserAndEquipment = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error("Error fetching user:", userError.message);
+        return;
+      }
+      if (!user) return;
 
-        setUserEmail(user.email);
+      setUserEmail(user.email);
 
-        // First get this user's row from "users" table using auth_id
-        const { data: userRow, error: userDbError } = await supabase
+      // Try fetching user row by auth_id first
+      let { data: userRow, error: userDbError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("auth_id", user.id)
+        .maybeSingle();
+
+      // Fallback: fetch by id if auth_id is missing
+      if (!userRow) {
+        ({ data: userRow, error: userDbError } = await supabase
           .from("users")
           .select("id")
-          .eq("auth_id", user.id)
-          .single();
-
-        if (userDbError || !userRow) {
-          console.error("Could not find user row:", userDbError?.message);
-          return;
-        }
-
-        const userId = userRow.id; // ✅ this matches supervisor_id in construction_sites
-
-        // Now fetch sites using users.id
-        const sites = await fetchUserSites(userId);
-        setUserSites(sites);
-
-        // Set initial selected site to the first available site
-        const initialSiteId = sites.length > 0 ? sites[0].id : null;
-        if (initialSiteId) {
-          setSelectedSiteId(initialSiteId);
-          await refreshEquipment(initialSiteId);
-          await refreshRequests(initialSiteId);
-          await refreshOutgoingRequests(initialSiteId);
-        } else {
-          console.warn("User has no sites assigned.");
-        }
-      } catch (err) {
-        console.error("Unexpected error:", err);
-      } finally {
-        setLoading(false);
+          .eq("id", user.id)
+          .maybeSingle());
       }
-    };
 
-    fetchUserAndEquipment();
-  }, []);
+      if (!userRow) {
+        console.error("Could not find user row:", userDbError?.message);
+        return;
+      }
+
+      const userId = userRow.id; // matches supervisor_id in construction_sites
+
+      // Fetch sites using users.id
+      const sites = await fetchUserSites(userId);
+      setUserSites(sites);
+
+      // Set initial selected site
+      const initialSiteId = sites.length > 0 ? sites[0].id : null;
+      if (initialSiteId) {
+        setSelectedSiteId(initialSiteId);
+        await refreshEquipment(initialSiteId);
+        await refreshRequests(initialSiteId);
+        await refreshOutgoingRequests(initialSiteId);
+      } else {
+        console.warn("User has no sites assigned.");
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchUserAndEquipment();
+}, []);
 
   const handleLogout = async () => {
     try {
