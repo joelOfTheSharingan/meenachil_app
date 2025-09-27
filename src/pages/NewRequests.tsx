@@ -3,6 +3,13 @@ import { supabase } from "../lib/supabase.ts";
 import { useAuth } from "../contexts/AuthContext.tsx";
 import { useNavigate } from "react-router-dom";
 
+interface EquipmentItem {
+  id: number;
+  name: string;
+  total: number;
+  type: "nonRental" | "rental";
+}
+
 const NewRequests: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -12,14 +19,13 @@ const NewRequests: React.FC = () => {
   const [toSites, setToSites] = useState<{ id: string; site_name: string }[]>([]);
   const [toSiteId, setToSiteId] = useState<string>("");
 
-  const [equipmentList, setEquipmentList] = useState<{ id: number; name: string; total: number }[]>([]);
+  const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
   const [selectedEquipment, setSelectedEquipment] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
   const [maxQuantity, setMaxQuantity] = useState<number>(1);
-
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Fetch all sites for the supervisor
+  // Fetch supervisor's sites
   useEffect(() => {
     const fetchSupervisorSites = async () => {
       if (!user) return;
@@ -36,14 +42,14 @@ const NewRequests: React.FC = () => {
 
       if (sitesData && sitesData.length > 0) {
         setFromSites(sitesData);
-        setFromSiteId(sitesData[0].id); // default selection
+        setFromSiteId(sitesData[0].id);
       }
     };
 
     fetchSupervisorSites();
   }, [user]);
 
-  // Fetch all construction sites for "To Site"
+  // Fetch all sites for "To Site"
   useEffect(() => {
     const fetchSites = async () => {
       const { data, error } = await supabase.from("construction_sites").select("id, site_name");
@@ -53,18 +59,17 @@ const NewRequests: React.FC = () => {
       }
       setToSites(data || []);
     };
-
     fetchSites();
   }, []);
 
-  // Fetch equipment for selected "From Site"
+  // Fetch equipment and sum non-rental and rental separately
   useEffect(() => {
     if (!fromSiteId) return;
 
     const fetchEquipment = async () => {
       const { data, error } = await supabase
         .from("equipment")
-        .select("id, name, quantity")
+        .select("id, name, quantity, isRental")
         .eq("site_id", fromSiteId);
 
       if (error) {
@@ -72,19 +77,30 @@ const NewRequests: React.FC = () => {
         return;
       }
 
-      const grouped: Record<string, { id: number; total: number }> = {};
+      const nonRentalGrouped: Record<string, { id: number; total: number }> = {};
+      const rentalGrouped: Record<string, { id: number; total: number }> = {};
+
       (data || []).forEach((eq) => {
-        if (!grouped[eq.name]) grouped[eq.name] = { id: eq.id, total: 0 };
-        grouped[eq.name].total += eq.quantity || 0;
+        const target = eq.isRental ? rentalGrouped : nonRentalGrouped;
+        if (!target[eq.name]) target[eq.name] = { id: eq.id, total: 0 };
+        target[eq.name].total += eq.quantity || 0;
       });
 
-      const result = Object.entries(grouped).map(([name, { id, total }]) => ({
+      const nonRentalList = Object.entries(nonRentalGrouped).map(([name, { id, total }]) => ({
         id,
         name,
         total,
+        type: "nonRental" as const,
       }));
 
-      setEquipmentList(result);
+      const rentalList = Object.entries(rentalGrouped).map(([name, { id, total }]) => ({
+        id,
+        name,
+        total,
+        type: "rental" as const,
+      }));
+
+      setEquipmentList([...nonRentalList, ...rentalList]);
     };
 
     fetchEquipment();
@@ -105,13 +121,12 @@ const NewRequests: React.FC = () => {
     }
   }, [selectedEquipment, equipmentList]);
 
-  // Handle form submission
+  // Handle submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fromSiteId || !user?.id || !selectedEquipment || !toSiteId || quantity <= 0) return;
 
     setLoading(true);
-
     const { error } = await supabase.from("equipment_transfers").insert([
       {
         equipment_id: Number(selectedEquipment),
@@ -122,7 +137,6 @@ const NewRequests: React.FC = () => {
         quantity,
       },
     ]);
-
     setLoading(false);
 
     if (error) {
@@ -150,7 +164,7 @@ const NewRequests: React.FC = () => {
       <h1 className="text-xl font-bold mb-4">New Tool Transfer</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* From Site Dropdown */}
+        {/* From Site */}
         <div>
           <label className="block text-sm font-medium mb-1">From Site</label>
           <select
@@ -166,25 +180,37 @@ const NewRequests: React.FC = () => {
           </select>
         </div>
 
-        {/* Equipment Dropdown */}
+        {/* Equipment */}
         <div>
           <label className="block text-sm font-medium mb-1">Equipment to Transfer</label>
           <select
-            value={selectedEquipment}
-            onChange={(e) => setSelectedEquipment(e.target.value)}
-            required
-            className="w-full border rounded-lg p-2"
-          >
-            <option value="">Select equipment</option>
-            {equipmentList.map((eq) => (
-              <option key={eq.id} value={eq.id}>
-                {eq.name} (Available: {eq.total})
-              </option>
-            ))}
-          </select>
+  value={selectedEquipment}
+  onChange={(e) => setSelectedEquipment(e.target.value)}
+  required
+  className="w-full border rounded-lg p-2"
+>
+  <option value="">Select equipment</option>
+  {/* Non-rental first */}
+  {equipmentList
+    .filter((eq) => eq.type === "nonRental" && eq.total > 0)
+    .map((eq) => (
+      <option key={eq.id} value={eq.id}>
+        {eq.name} (Available: {eq.total})
+      </option>
+    ))}
+  {/* Rentals */}
+  {equipmentList
+    .filter((eq) => eq.type === "rental" && eq.total > 0)
+    .map((eq) => (
+      <option key={eq.id} value={eq.id}>
+        {eq.name} (Rental Available: {eq.total})
+      </option>
+    ))}
+</select>
+
         </div>
 
-        {/* Quantity Input */}
+        {/* Quantity */}
         <div>
           <label className="block text-sm font-medium mb-1">Quantity (Max: {maxQuantity})</label>
           <input
@@ -198,7 +224,7 @@ const NewRequests: React.FC = () => {
           />
         </div>
 
-        {/* To Site Dropdown */}
+        {/* To Site */}
         <div>
           <label className="block text-sm font-medium mb-1">To Site</label>
           <select

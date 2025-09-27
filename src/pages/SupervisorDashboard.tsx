@@ -38,7 +38,7 @@ const Dashboard: React.FC = () => {
           status,
           accepted,
           comment,
-          equipment(name),
+          equipment(name, isRental),
           from_site_id,
           to_site_id,
           from_site:from_site_id(site_name),
@@ -71,7 +71,7 @@ const Dashboard: React.FC = () => {
           status,
           accepted,
           comment,
-          equipment(name),
+          equipment(name, isRental),
           from_site_id,
           to_site_id,
           from_site:from_site_id(site_name),
@@ -469,9 +469,17 @@ const Dashboard: React.FC = () => {
                       key={req.id}
                       className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm"
                     >
-                      <span className="font-medium text-gray-700">
-                        {req.equipment?.name || "Unknown Equipment"}
-                      </span>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-medium text-gray-700">
+                          {req.equipment?.name || "Unknown Equipment"}
+                        </span>
+                        {req.equipment?.isRental && (
+                          <span className="text-white text-xs px-3 py-1 rounded-full border border-green-800 bg-green-500/70">
+                              Rental
+                          </span>
+
+                        )}
+                      </div>
                       <span className="text-sm text-gray-500">
                         Quantity: {req.quantity ?? "N/A"}
                       </span>
@@ -518,9 +526,16 @@ const Dashboard: React.FC = () => {
                 ) : (
                   outgoingRequests.map((req) => (
                     <div key={req.id} className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm">
-                      <span className="font-medium text-gray-700">
-                        {req.equipment?.name || "Unknown Equipment"}
-                      </span>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-medium text-gray-700">
+                          {req.equipment?.name || "Unknown Equipment"}
+                        </span>
+                        {req.equipment?.isRental && (
+                          <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                            Rental
+                          </span>
+                        )}
+                      </div>
                       <span className="text-sm text-gray-500">Quantity: {req.quantity ?? "N/A"}</span>
                       <span className="text-sm text-gray-500">
                         To: {req.to_site?.site_name || "Unknown Site"}
