@@ -24,22 +24,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ✅ Ensure user row exists
   const ensureUserRow = async (authId: string, email: string, role: Role = "supervisor") => {
     try {
-      const { data, error } = await supabase
+      // First check if user exists by auth_id
+      const { data: authData, error: authError } = await supabase
         .from("users")
         .select("*")
         .eq("auth_id", authId)
         .maybeSingle();
 
-      if (!data && !error) {
+      // If not found by auth_id, check by email (in case auth_id changed)
+      let { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (authData && !authError) {
+        // User found by auth_id - check if we need to update auth_id
+        console.log("✅ User found by auth_id");
+        if (authData.auth_id !== authId) {
+          console.log("🔄 Updating auth_id for existing user");
+          const { error: updateError } = await supabase
+            .from("users")
+            .update({ auth_id: authId })
+            .eq("id", authData.id);
+          if (updateError) console.error("Error updating auth_id:", updateError);
+        }
+        return;
+      }
+
+      if (data && !error) {
+        // User found by email - update auth_id
+        console.log("✅ User found by email, updating auth_id");
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({ auth_id: authId })
+          .eq("id", data.id);
+        if (updateError) console.error("Error updating auth_id:", updateError);
+      } else if (!data && !error) {
+        // No user found - create new user
+        console.log("➕ Creating new user row");
         const { error: insertError } = await supabase.from("users").insert([
           {
             auth_id: authId,
             email,
-            name: email.split("@")[0],
             role,
           },
         ]);
-        if (insertError) console.error("Error inserting user row:", insertError);
+        if (insertError) {
+          console.error("Error inserting user row:", insertError);
+        } else {
+          console.log("✅ New user created successfully");
+        }
       }
     } catch (err) {
       console.error("ensureUserRow failed:", err);
