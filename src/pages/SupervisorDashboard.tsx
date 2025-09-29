@@ -380,6 +380,27 @@ const Dashboard: React.FC = () => {
               </svg>
               <span>New Request</span>
             </Link>
+            <Link
+          to="/send-request"
+          className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-md transition-colors"
+          onClick={() => setSidebarOpen(false)}
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          <span>Send Request</span>
+          </Link>
+
           </nav>
         </div>
       </div>

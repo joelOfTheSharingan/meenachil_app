@@ -24,38 +24,92 @@ export default function AssignSites() {
   const [selectedSite, setSelectedSite] = useState<string>("");
   const [selectedSupervisor, setSelectedSupervisor] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
   // Fetch all construction sites (with assigned supervisors)
   const fetchSites = async () => {
+    console.log("🔄 Fetching sites...");
     const { data, error } = await supabase
       .from("construction_sites")
-      .select("id, site_name, supervisor_id, supervisor:supervisor_id (id, username, email)");
+      .select("id, site_name, supervisor_id");
 
     if (error) {
-      console.error("Error fetching sites:", error);
+      console.error("❌ Error fetching sites:", error);
       return;
     }
+    console.log("✅ Sites fetched:", data);
     setSites(data || []);
   };
 
   // Fetch supervisors list
   const fetchSupervisors = async () => {
+    console.log("🔄 Fetching supervisors...");
     const { data, error } = await supabase
       .from("users")
       .select("id, username, email")
       .eq("role", "supervisor");
 
     if (error) {
-      console.error("Error fetching supervisors:", error);
+      console.error("❌ Error fetching supervisors:", error);
       return;
     }
+    console.log("✅ Supervisors fetched:", data);
     setSupervisors(data || []);
   };
 
   useEffect(() => {
-    fetchSites();
-    fetchSupervisors();
+    let mounted = true;
+    
+    const loadData = async () => {
+      try {
+        if (mounted) {
+          setPageLoading(true);
+          console.log("🚀 Starting data load...");
+        }
+        
+        const [sitesResult, supervisorsResult] = await Promise.allSettled([
+          fetchSites(), 
+          fetchSupervisors()
+        ]);
+        
+        if (mounted) {
+          console.log("✅ Data loading complete");
+          setPageLoading(false);
+        }
+      } catch (error) {
+        console.error("❌ Error loading data:", error);
+        if (mounted) {
+          setPageLoading(false);
+        }
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  // Handle supervisor selection change
+  const handleSupervisorChange = (supervisorId: string) => {
+    setSelectedSupervisor(supervisorId);
+    // Do not auto-select site - let user choose manually
+  };
+
+  // Handle site selection change
+  const handleSiteChange = (siteId: string) => {
+    setSelectedSite(siteId);
+    
+    // Find the supervisor currently assigned to this site
+    const siteSupervisor = sites.find(site => site.id === siteId);
+    
+    if (siteSupervisor && siteSupervisor.supervisor_id) {
+      setSelectedSupervisor(siteSupervisor.supervisor_id);
+    } else {
+      setSelectedSupervisor(""); // Clear supervisor selection if site has no current assignment
+    }
+  };
 
   // Handle assignment
   const handleAssign = async (e: React.FormEvent) => {
@@ -82,6 +136,19 @@ export default function AssignSites() {
     }
   };
 
+  if (pageLoading) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto bg-white shadow-md rounded-xl">
+        <div className="flex items-center justify-center min-h-[200px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading sites and supervisors...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-2xl mx-auto bg-white shadow-md rounded-xl">
       <h1 className="text-2xl font-bold mb-6">Assign Supervisors to Sites</h1>
@@ -89,10 +156,10 @@ export default function AssignSites() {
       <form onSubmit={handleAssign} className="space-y-4 mb-8">
         {/* Site Dropdown */}
         <div>
-          <label className="block text-sm font-medium mb-1">Select Site</label>
+          <label className="block text-sm font-medium mb-1">Select Site ({sites.length} available)</label>
           <select
             value={selectedSite}
-            onChange={(e) => setSelectedSite(e.target.value)}
+            onChange={(e) => handleSiteChange(e.target.value)}
             required
             className="w-full border rounded-lg p-2"
           >
@@ -107,17 +174,17 @@ export default function AssignSites() {
 
         {/* Supervisor Dropdown */}
         <div>
-          <label className="block text-sm font-medium mb-1">Select Supervisor</label>
+          <label className="block text-sm font-medium mb-1">Select Investigator/Supervisor ({supervisors.length} available)</label>
           <select
             value={selectedSupervisor}
-            onChange={(e) => setSelectedSupervisor(e.target.value)}
+            onChange={(e) => handleSupervisorChange(e.target.value)}
             required
             className="w-full border rounded-lg p-2"
           >
             <option value="">Choose a supervisor</option>
             {supervisors.map((sup) => (
               <option key={sup.id} value={sup.id}>
-                {sup.username} ({sup.email})
+                {sup.username ? sup.username : sup.email.split('@')[0]} ({sup.email})
               </option>
             ))}
           </select>
@@ -133,31 +200,37 @@ export default function AssignSites() {
       </form>
 
       {/* Current Site Assignments */}
-      {/* Current Site Assignments */}
-<div>
-  <h2 className="text-xl font-semibold mb-4">Current Site Assignments</h2>
-  {sites.length === 0 ? (
-    <p className="text-gray-500">No sites available.</p>
-  ) : (
-    <ul className="space-y-3">
-      {sites.map((site) => (
-        <li
-          key={site.id}
-          className="p-4 border rounded-lg bg-gray-50 flex justify-between"
-        >
-          <span className="font-medium">{site.site_name}</span>
-          <span className="text-sm text-gray-600">
-            {site.supervisor
-              ? site.supervisor.username
-                ? site.supervisor.username
-                : site.supervisor.email
-              : "Unassigned"}
-          </span>
-        </li>
-      ))}
-    </ul>
-  )}
-</div>
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Current Site Assignments</h2>
+        {sites.length === 0 ? (
+          <p className="text-gray-500">No sites available.</p>
+        ) : (
+          <ul className="space-y-3">
+            {sites.map((site) => {
+              // Find the supervisor assigned to this site
+              const assignedSupervisor = supervisors.find(sup => sup.id === site.supervisor_id);
+              const supervisorDisplay = assignedSupervisor 
+                ? (assignedSupervisor.username ? assignedSupervisor.username : assignedSupervisor.email.split('@')[0])
+                : null;
+              
+              return (
+                <li
+                  key={site.id}
+                  className="p-4 border rounded-lg bg-gray-50 flex justify-between"
+                >
+                  <span className="font-medium">{site.site_name}</span>
+                  <span className="text-sm text-gray-600">
+                    {site.supervisor_id && supervisorDisplay && assignedSupervisor
+                      ? `${supervisorDisplay} (${assignedSupervisor.email})`
+                      : "Unassigned"
+                    }
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
 
     </div>
   );
