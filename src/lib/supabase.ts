@@ -29,10 +29,10 @@ export type User = {
  * Matches the `construction_sites` table
  */
 export type ConstructionSite = {
-  id: string; // UUID
+  id: string;
   site_name: string;
   contractor: string;
-  supervisor_id: string; // user.id (UUID)
+  supervisor_id: string;
 };
 
 /**
@@ -42,8 +42,8 @@ export type Equipment = {
   id: number; // Postgres int8
   name: string;
   status: "available" | "in use" | "transferring";
-  site_id: string; // UUID
-  isRental: boolean;
+  site_id: string;
+  isRental: boolean; 
   quantity: number; // ✅ Track quantity directly
 };
 
@@ -53,29 +53,28 @@ export type Equipment = {
 export type EquipmentTransfer = {
   id: number; // Postgres int8
   equipment_id: number; // int8
-  from_site_id: string; // UUID
-  to_site_id: string; // UUID
-  requested_by: string; // user.id (UUID)
-  approved_by?: string; // user.id (UUID)
-  quantity: number;
+  from_site_id: string;
+  to_site_id: string;
+  requested_by: string; // user id
+  approved_by?: string; // user id
+  quantity: number; // number being moved
   status: "pending" | "approved" | "rejected";
-  comment?: string;
+  comment?: string; // optional comment
   created_at: string;
 };
 
 /**
  * Matches the `equipment_requests` table
- * New table for buy / sell / return requests
  */
 export type EquipmentRequest = {
-  id: number; // Postgres int8
-  site_id: string; // UUID → references construction_sites.id
-  requested_by: string; // UUID → references users.id
-  type: "buy" | "sell" | "return"; // what action
-  equipment_name: string; // supervisor can enter custom name
-  isRental: boolean; 
+  id: string; // UUID
+  site_id: string; // UUID -> construction_sites.id
+  supervisor_id: string; // UUID -> users.id
+  type: "buy" | "sell" | "return" | "rent";
+  equipment_name?: string; // if supervisor types custom name
+  equipment_id?: number; // nullable -> equipment.id
   quantity: number;
+  isRental: boolean;
   status: "pending" | "approved" | "rejected";
-  approved_by?: string; // UUID → user.id
   created_at: string;
 };

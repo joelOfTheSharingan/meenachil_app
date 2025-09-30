@@ -1,126 +1,226 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.ts";
 import { useAuth } from "../contexts/AuthContext.tsx";
+import { useNavigate } from "react-router-dom";
+
+interface Site {
+  id: string;
+  site_name: string;
+}
 
 const SendRequest: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const [action, setAction] = useState<"buy" | "sell" | "return">("buy");
-  const [sites, setSites] = useState<{ id: string; site_name: string }[]>([]);
-  const [selectedSite, setSelectedSite] = useState("");
-  const [equipmentList, setEquipmentList] = useState<{ id: number; name: string }[]>([]);
-  const [selectedEquipment, setSelectedEquipment] = useState("");
-  const [customEquipment, setCustomEquipment] = useState("");
+  const [type, setType] = useState<"buy" | "sell" | "return" | "rent">("buy");
+  const [equipmentList, setEquipmentList] = useState<{ id: number; name: string; isRental: boolean; site_name: string }[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<string>("");
+  const [customEquipment, setCustomEquipment] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
-  const [isRental, setIsRental] = useState<boolean>(false);
+  const [userSites, setUserSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
-  // Fetch sites supervised by the current user
-  useEffect(() => {
-    const fetchSites = async () => {
-      if (!user?.id) return;
-      const { data, error } = await supabase
+  // Fetch user sites
+  const fetchUserSites = async (userId: string) => {
+    try {
+      const { data: sitesData, error } = await supabase
         .from("construction_sites")
         .select("id, site_name")
-        .eq("supervisor_id", user.id);
+        .eq("supervisor_id", userId);
+
       if (error) {
-        console.error("Error fetching sites:", error);
-        return;
+        console.error("Error fetching user sites:", error.message);
+        return [];
       }
-      setSites(data || []);
-    };
-    fetchSites();
-  }, [user]);
 
-  // Fetch equipment for the selected site
-  useEffect(() => {
-    const fetchEquipment = async () => {
-      if (!selectedSite) return;
-      const { data, error } = await supabase
-        .from("equipment")
-        .select("id, name")
-        .eq("site_id", selectedSite);
-      if (error) {
-        console.error("Error fetching equipment:", error);
-        return;
-      }
-      setEquipmentList(data || []);
-    };
-    fetchEquipment();
-  }, [selectedSite]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-
-    if (!selectedSite) {
-      alert("Please select a site.");
-      return;
-    }
-
-    const equipmentName = selectedEquipment
-      ? equipmentList.find((eq) => eq.id === Number(selectedEquipment))?.name
-      : customEquipment;
-
-    if (!equipmentName) {
-      alert("Please select or enter equipment.");
-      return;
-    }
-
-    const { error } = await supabase.from("equipment_requests").insert([
-  {
-    supervisor_id: user.id,
-    site_id: selectedSite,
-    equipment_id: selectedEquipment ? Number(selectedEquipment) : null,
-    equipment_name: equipmentName,
-    quantity,
-    isRental,
-    created_at: new Date().toISOString(),
-    type: action, // << Add this line to satisfy NOT NULL constraint
-  },
-]);
-
-    if (error) {
-      console.error("Error creating request:", error);
-      alert("❌ Failed to send request");
-    } else {
-      alert("✅ Request submitted successfully!");
-      // Reset form
-      setSelectedEquipment("");
-      setCustomEquipment("");
-      setQuantity(1);
-      setIsRental(false);
+      return sitesData || [];
+    } catch (err) {
+      console.error("Unexpected error while fetching sites:", err);
+      return [];
     }
   };
 
+  // Fetch all equipment with site information
+  const fetchAllEquipment = async () => {
+    const { data, error } = await supabase
+      .from("equipment")
+      .select(`
+        id, 
+        name, 
+        isRental,
+        site:site_id(site_name)
+      `);
+    
+    if (error) {
+      console.error("Error fetching equipment:", error);
+      return;
+    }
+    
+    // Transform the data to include site_name
+    const transformedData = (data || []).map((eq: any) => ({
+      id: eq.id,
+      name: eq.name,
+      isRental: eq.isRental,
+      site_name: eq.site?.site_name || "Unknown Site"
+    }));
+    
+    setEquipmentList(transformedData);
+  };
+
+  useEffect(() => {
+    const initializeData = async () => {
+      if (!user?.id) return;
+
+      try {
+        // Get user's sites
+        const sites = await fetchUserSites(user.id);
+        setUserSites(sites);
+
+        // Set initial site if available
+        if (sites.length > 0) {
+          const initialSiteId = sites[0].id;
+          setSelectedSiteId(initialSiteId);
+        }
+
+        // Fetch all equipment
+        await fetchAllEquipment();
+      } catch (err) {
+        console.error("Error initializing data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeData();
+  }, [user]);
+
+  // Handle site selection change
+  const handleSiteChange = (siteId: string) => {
+    setSelectedSiteId(siteId);
+    setSelectedEquipment(""); // Reset equipment selection
+    setCustomEquipment(""); // Reset custom equipment
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !selectedSiteId) {
+      alert("Please select a site");
+      return;
+    }
+
+    // Validation based on type
+    if (type === "buy") {
+      // For buy, either select existing equipment or enter custom name
+      if (!selectedEquipment && !customEquipment.trim()) {
+        alert("Please select existing equipment or enter a custom equipment name");
+        return;
+      }
+    } else {
+      // For sell/return/rent, must select existing equipment
+      if (!selectedEquipment) {
+        alert(`Please select existing equipment to ${type}`);
+        return;
+      }
+    }
+
+    if (quantity <= 0) {
+      alert("Quantity must be greater than 0");
+      return;
+    }
+
+    try {
+      // Determine if this is a rental based on type or selected equipment
+      let isRental = false;
+      if (type === "rent" || type === "return") {
+        isRental = true;
+      } else if (selectedEquipment) {
+        // Check if selected equipment is rental
+        const selectedEq = equipmentList.find(eq => eq.id.toString() === selectedEquipment);
+        isRental = selectedEq?.isRental || false;
+      }
+
+      const { error } = await supabase.from("equipment_requests").insert([
+        {
+          supervisor_id: user.id,
+          site_id: selectedSiteId,
+          equipment_id: selectedEquipment ? Number(selectedEquipment) : null,
+          equipment_name: selectedEquipment ? undefined : customEquipment.trim(),
+          quantity,
+          type,
+          isRental,
+          status: "pending",
+        },
+      ]);
+
+      if (error) {
+        console.error("Error creating request:", error);
+        alert("❌ Failed to send request");
+      } else {
+        alert("✅ Request submitted to admin");
+        // Reset form
+        setSelectedEquipment("");
+        setCustomEquipment("");
+        setQuantity(1);
+        // Navigate back to supervisor dashboard
+        navigate("/supervisor");
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      alert("❌ Failed to send request");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (userSites.length === 0) {
+    return (
+      <div className="p-6 max-w-lg mx-auto bg-white shadow-md rounded-xl">
+        <h1 className="text-xl font-bold mb-4 text-red-600">No Sites Assigned</h1>
+        <p className="text-gray-600 mb-4">
+          You don't have any construction sites assigned. Please contact an administrator.
+        </p>
+        <button
+          onClick={() => navigate("/supervisor")}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+        >
+          Back to Dashboard
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-lg mx-auto bg-white shadow-md rounded-xl">
-      <h1 className="text-xl font-bold mb-4">Send Request</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold">Send Request</h1>
+        <button
+          onClick={() => navigate("/supervisor")}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Action Selector */}
+        {/* Site Selection */}
         <div>
-          <label className="block mb-1 font-medium">Action</label>
+          <label className="block mb-1 font-medium text-gray-700">Construction Site</label>
           <select
-            value={action}
-            onChange={(e) => setAction(e.target.value as "buy" | "sell" | "return")}
-            className="w-full border rounded-lg p-2"
+            value={selectedSiteId}
+            onChange={(e) => handleSiteChange(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="buy">Buy</option>
-            <option value="sell">Sell</option>
-            <option value="return">Return</option>
-          </select>
-        </div>
-
-        {/* Site Selector */}
-        <div>
-          <label className="block mb-1 font-medium">Select Site</label>
-          <select
-            value={selectedSite}
-            onChange={(e) => setSelectedSite(e.target.value)}
-            className="w-full border rounded-lg p-2"
-          >
-            <option value="">Select a site</option>
-            {sites.map((site) => (
+            <option value="">Select a site...</option>
+            {userSites.map((site) => (
               <option key={site.id} value={site.id}>
                 {site.site_name}
               </option>
@@ -128,61 +228,125 @@ const SendRequest: React.FC = () => {
           </select>
         </div>
 
-        {/* Equipment Selector */}
+        {/* Type Selector */}
         <div>
-          <label className="block mb-1 font-medium">Equipment</label>
+          <label className="block mb-1 font-medium text-gray-700">Type</label>
           <select
-            value={selectedEquipment}
-            onChange={(e) => setSelectedEquipment(e.target.value)}
-            className="w-full border rounded-lg p-2 mb-2"
+            value={type}
+            onChange={(e) => {
+              setType(e.target.value as "buy" | "sell" | "return" | "rent");
+              // Reset equipment selection when type changes
+              setSelectedEquipment("");
+              setCustomEquipment("");
+            }}
+            className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Select existing equipment</option>
-            {equipmentList.map((eq) => (
-              <option key={eq.id} value={eq.id}>
-                {eq.name}
-              </option>
-            ))}
+            <option value="buy">Buy</option>
+            <option value="sell">Sell</option>
+            <option value="rent">Rent</option>
+            <option value="return">Return</option>
           </select>
-          <input
-            type="text"
-            placeholder="Or enter custom equipment"
-            value={customEquipment}
-            onChange={(e) => setCustomEquipment(e.target.value)}
-            className="w-full border rounded-lg p-2"
-          />
+        </div>
+
+        {/* Equipment Selection */}
+        <div>
+          <label className="block mb-1 font-medium text-gray-700">Equipment</label>
+          
+          {/* Show dropdown for existing equipment (always for sell/return/rent, optional for buy) */}
+          {(type === "sell" || type === "return" || type === "rent" || type === "buy") && (
+            <select
+              value={selectedEquipment}
+              onChange={(e) => {
+                setSelectedEquipment(e.target.value);
+                if (e.target.value) setCustomEquipment(""); // Clear custom if selecting existing
+              }}
+              className="w-full border border-gray-300 rounded-lg p-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">
+                {type === "buy" ? "Select existing equipment (optional)" : `Select equipment to ${type}`}
+              </option>
+              {(() => {
+                // Group equipment by name, type (rental vs owned), and site
+                const groupedEquipment = equipmentList.reduce((acc, eq) => {
+                  const key = `${eq.name}_${eq.isRental ? 'rental' : 'owned'}_${eq.site_name}`;
+                  if (!acc[key]) {
+                    acc[key] = {
+                      name: eq.name,
+                      isRental: eq.isRental,
+                      site_name: eq.site_name,
+                      ids: []
+                    };
+                  }
+                  acc[key].ids.push(eq.id);
+                  return acc;
+                }, {} as Record<string, { name: string; isRental: boolean; site_name: string; ids: number[] }>);
+
+                return Object.entries(groupedEquipment).map(([key, group]) => (
+                  <option key={key} value={group.ids[0]}>
+                    {group.name} {group.isRental ? '(Rental)' : '(Owned)'} - {group.site_name}
+                  </option>
+                ));
+              })()}
+            </select>
+          )}
+
+          {/* Show custom input for buy type */}
+          {type === "buy" && (
+            <input
+              type="text"
+              placeholder="Or enter custom equipment name"
+              value={customEquipment}
+              onChange={(e) => {
+                setCustomEquipment(e.target.value);
+                if (e.target.value) setSelectedEquipment(""); // Clear selection if typing custom
+              }}
+              className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          )}
+
+          {type === "sell" || type === "return" || type === "rent" ? (
+            <p className="text-sm text-gray-500 mt-1">
+              You must select existing equipment from your site to {type}.
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500 mt-1">
+              Select existing equipment or enter a custom name for new equipment.
+            </p>
+          )}
         </div>
 
         {/* Quantity */}
         <div>
-          <label className="block mb-1 font-medium">Quantity</label>
+          <label className="block mb-1 font-medium text-gray-700">Quantity</label>
           <input
             type="number"
             min={1}
             value={quantity}
             onChange={(e) => setQuantity(Number(e.target.value))}
-            className="w-full border rounded-lg p-2"
+            className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
-        {/* Rental Toggle */}
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={isRental}
-            onChange={(e) => setIsRental(e.target.checked)}
-          />
-          <label>Is Rental</label>
-        </div>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-        >
-          Send Request
-        </button>
+        <div className="flex space-x-3">
+          <button
+            type="button"
+            onClick={() => navigate("/supervisor")}
+            className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Send Request
+          </button>
+        </div>
       </form>
     </div>
   );
 };
 
 export default SendRequest;
+

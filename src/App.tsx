@@ -14,7 +14,7 @@ import UserManagement from './pages/Users.tsx'
 import AssignSites from './pages/AssignSites.tsx'
 import TransactionLogs from './pages/TransactionLogs.tsx'
 import SendRequest from "./pages/SendRequest.tsx";
-import CreateSitePage from "./pages/CreateSitePage.tsx";
+import EquipmentRequests from "./pages/EquipmentRequests.tsx";
 
 // ✅ Loader component
 const Loader: React.FC = () => (
@@ -142,8 +142,18 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      <Route path="/create-site" element={<CreateSitePage />} />
       <Route path="/send-request" element={<SendRequest />} />
+      
+      {/* ✅ Equipment Requests page (admin only) */}
+      <Route
+        path="/equipment-requests"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <EquipmentRequests />
+          </ProtectedRoute>
+        }
+      />
+      
       {/* 404 → go home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
