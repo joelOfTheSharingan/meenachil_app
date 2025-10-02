@@ -16,6 +16,9 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(false);
   const [confirmUser, setConfirmUser] = useState<User | null>(null);
   const [newRole, setNewRole] = useState<string | null>(null);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<string>("");
 
   const navigate = useNavigate();
 
@@ -57,6 +60,25 @@ export default function UserManagement() {
     setNewRole(null);
   };
 
+  const deleteUser = async () => {
+    if (!confirmDeleteUser) return;
+    setDeleting(true);
+    const { error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", confirmDeleteUser.id);
+
+    if (error) {
+      console.error("Error deleting user:", error.message);
+      alert("❌ Failed to delete user. They may have related records.");
+    } else {
+      alert("✅ User deleted");
+      await fetchUsers();
+    }
+    setDeleting(false);
+    setConfirmDeleteUser(null);
+  };
+
   return (
     <div className="p-6 max-w-3xl mx-auto">
       {/* Navigation Button */}
@@ -95,31 +117,47 @@ export default function UserManagement() {
             return (
               <li
                 key={user.id}
-                className="p-4 border rounded flex justify-between items-center"
+                className="p-4 border rounded"
               >
-                <div>
-                  <p>
-                    <strong>Name:</strong> {user.username}
-                  </p>
-                  <p>
-                    <strong>Email:</strong> {user.email}
-                  </p>
-                  <p>
-                    <strong>Role:</strong> {user.role}
-                  </p>
+                <div
+                  className="flex justify-between items-start cursor-pointer"
+                  onClick={() => setExpandedUserId(prev => prev === user.id ? "" : user.id)}
+                  title="View actions"
+                >
+                  <div>
+                    <p>
+                      <strong>Name:</strong> {user.username}
+                    </p>
+                    <p>
+                      <strong>Email:</strong> {user.email}
+                    </p>
+                    <p>
+                      <strong>Role:</strong> {user.role}
+                    </p>
+                  </div>
                 </div>
-
-                <div>
-                  <button
-                    onClick={() => {
-                      setConfirmUser(user);
-                      setNewRole(targetRole);
-                    }}
-                    className={`w-32 text-white px-3 py-1 rounded-lg text-sm transition duration-300 ${buttonColor}`}
-                  >
-                    {targetRole === "admin" ? "Make Admin" : "Make Supervisor"}
-                  </button>
-                </div>
+                {expandedUserId === user.id && (
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmUser(user); setNewRole(targetRole); }}
+                      className={`w-32 text-white px-3 py-1 rounded-lg text-sm transition duration-300 ${buttonColor}`}
+                    >
+                      {targetRole === "admin" ? "Make Admin" : "Make Supervisor"}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteUser(user); }}
+                      className="w-24 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm transition duration-300"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setExpandedUserId(""); }}
+                      className="px-3 py-1 rounded-lg border text-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
               </li>
             );
           })}
@@ -152,6 +190,32 @@ export default function UserManagement() {
                 className="w-24 bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded-lg"
               >
                 No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Popup */}
+      {confirmDeleteUser && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-80 text-center">
+            <p className="mb-4">
+              Delete user <span className="font-bold">{confirmDeleteUser.username || confirmDeleteUser.email}</span>?
+            </p>
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={deleteUser}
+                disabled={deleting}
+                className="w-24 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+              <button
+                onClick={() => setConfirmDeleteUser(null)}
+                className="w-24 bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded-lg"
+              >
+                Cancel
               </button>
             </div>
           </div>
