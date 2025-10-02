@@ -1,17 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.ts";
 import { Button } from "../components/ui/button.tsx";
-import { useAuth } from "../contexts/AuthContext.tsx";
 import { useNavigate } from "react-router-dom";
-
-interface Equipment {
-  id: string;
-  name: string;
-  site_id: string | null;
-  quantity: number;
-  isRental?: boolean;
-  construction_sites?: { site_name: string; id: string };
-}
+import { Mail } from "lucide-react";
 
 interface Site {
   id: string;
@@ -20,17 +11,15 @@ interface Site {
 
 interface EquipmentRow {
   name: string;
-  _ids: Record<string, string[]>; // Track equipment IDs per site
-  quantities: Record<string, string>; // Store as strings while editing
+  _ids: Record<string, string[]>; 
+  quantities: Record<string, string>; 
 }
 
-const EditableEquipmentTable: React.FC = () => {
-  // const { userRole } = useAuth();
+const AllInventory: React.FC = () => {
   const [equipmentRows, setEquipmentRows] = useState<EquipmentRow[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [recipient, setRecipient] = useState("");
   const navigate = useNavigate();
 
   const fetchData = async () => {
@@ -40,13 +29,13 @@ const EditableEquipmentTable: React.FC = () => {
         .from("equipment")
         .select("id, name, site_id, quantity, isRental, construction_sites(site_name, id)");
 
-      if (eqError) throw new Error(`Error fetching equipment: ${eqError.message}`);
+      if (eqError) throw new Error(eqError.message);
 
       const { data: sitesData, error: sitesError } = await supabase
         .from("construction_sites")
         .select("id, site_name");
 
-      if (sitesError) throw new Error(`Error fetching sites: ${sitesError.message}`);
+      if (sitesError) throw new Error(sitesError.message);
 
       setSites(sitesData || []);
 
@@ -60,8 +49,7 @@ const EditableEquipmentTable: React.FC = () => {
           rowsMap[rowName] = { name: rowName, _ids: {}, quantities: {} };
         }
 
-        const current = rowsMap[rowName].quantities[siteName] ?? "0";
-        const currentNum = parseInt(current || "0", 10);
+        const currentNum = parseInt(rowsMap[rowName].quantities[siteName] || "0", 10);
         rowsMap[rowName].quantities[siteName] = String(currentNum + (eq.quantity || 0));
 
         rowsMap[rowName]._ids[siteName] = rowsMap[rowName]._ids[siteName] || [];
@@ -81,58 +69,100 @@ const EditableEquipmentTable: React.FC = () => {
     fetchData();
   }, []);
 
-  // Handle cell input; allow empty string during editing so user can replace 0
-  const handleCellChange = (rowIndex: number, siteName: string, value: string) => {
-    const cleaned = value.replace(/[^0-9]/g, "");
-    const trimmed = cleaned.replace(/^0+(?=\d)/, "");
-    const nextValue = cleaned === "" ? "" : trimmed;
-    setEquipmentRows((prev) =>
-      prev.map((row, idx) =>
-        idx === rowIndex
-          ? { ...row, quantities: { ...row.quantities, [siteName]: nextValue } }
-          : row
-      )
-    );
+  const generateTableHTML = () => {
+    return `
+      <div style="font-family: system-ui, sans-serif, Arial; font-size: 14px;">
+        <h2 style="text-align:center; color:#2c3e50;">Equipment by Site</h2>
+        <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; width:100%; text-align:left;">
+          <thead style="background:#f5f5f5;">
+            <tr>
+              <th>Equipment</th>
+              <th>Total</th>
+              ${sites.map((s) => `<th>${s.site_name}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${equipmentRows
+              .map((row) => {
+                const quantities = row.quantities || {};
+                const total = Object.values(quantities).reduce(
+                  (sum, val) => sum + Number(val || 0),
+                  0
+                );
+                return `
+                  <tr>
+                    <td>${row.name}</td>
+                    <td>${total}</td>
+                    ${sites
+                      .map((s) => `<td>${Number(quantities[s.site_name] || 0)}</td>`)
+                      .join("")}
+                  </tr>
+                `;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
   };
 
-  // Save all changes to Supabase, including zero quantities
-  const handleSaveAll = async () => {
-    setSaving(true);
+  const generateEmailHTML = () => {
+    const tableHTML = generateTableHTML();
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Equipment Inventory</title>
+      </head>
+      <body style="font-family: system-ui, sans-serif, Arial; font-size: 14px; margin:0; padding:0; background:#f9f9f9;">
+        <div style="max-width:800px; margin:20px auto; padding:20px; background:#ffffff; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+          ${tableHTML}
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
+  const handleSendEmail = async () => {
+    if (!recipient || !/\S+@\S+\.\S+/.test(recipient)) {
+      alert("Please enter a valid recipient email");
+      return;
+    }
+
+    const emailHTML = generateEmailHTML();
+
     try {
-      for (const row of equipmentRows) {
-        for (const siteName in row._ids) {
-          const ids = row._ids[siteName];
-          const val = row.quantities[siteName];
-          const totalQty = val === "" ? 0 : Number(val ?? 0); // Explicitly handle empty and 0
+      const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: "service_8mvjhwk",
+          template_id: "template_2wv21ew",
+          user_id: "qrkekZ5E4Mwxfb_rY",
+          template_params: {
+            email: recipient,
+            subject: "Equipment Table",
+            message: emailHTML,
+          },
+        }),
+      });
 
-          if (ids.length === 0) continue;
-
-          const perRowQty = Math.floor(totalQty / ids.length);
-          const remainder = totalQty % ids.length;
-
-          for (let i = 0; i < ids.length; i++) {
-            const qtyToSet = i === 0 ? perRowQty + remainder : perRowQty;
-            const { error } = await supabase
-              .from("equipment")
-              .update({ quantity: qtyToSet })
-              .eq("id", ids[i]);
-            if (error) throw new Error(`Error updating equipment ${ids[i]}: ${error.message}`);
-          }
-        }
+      if (response.ok) {
+        alert("Email sent successfully!");
+      } else {
+        const errText = await response.text();
+        console.error("EmailJS Error:", errText);
+        alert("Failed to send email");
       }
-      setEditing(false);
-      await fetchData(); // Refresh data after saving
     } catch (err) {
-      console.error("Error saving equipment:", err);
-      alert("Failed to save changes. Please try again.");
-    } finally {
-      setSaving(false);
+      console.error(err);
+      alert("Error sending email");
     }
   };
 
-  if (loading) {
-    return <p className="text-center mt-10">Loading equipment...</p>;
-  }
+  if (loading) return <p className="text-center mt-10">Loading inventory...</p>;
 
   return (
     <div className="p-4">
@@ -142,71 +172,53 @@ const EditableEquipmentTable: React.FC = () => {
           <Button
             onClick={() => navigate("/supervisor")}
             className="bg-blue-600 hover:bg-blue-700"
-            disabled={saving}
           >
             Go to Home
           </Button>
-          <Button
-            onClick={() => setEditing(!editing)}
-            className="bg-yellow-500 hover:bg-yellow-600"
-            disabled={saving}
-          >
-            {editing ? "Cancel Edit" : "Edit"}
-          </Button>
-          {editing && (
-            <Button
-              onClick={handleSaveAll}
-              className="bg-green-600 hover:bg-green-700"
-              disabled={saving}
-            >
-              {saving ? "Saving..." : "Save All"}
-            </Button>
-          )}
         </div>
       </nav>
 
-      {/* Saving Indicator */}
-      {saving && (
-        <div className="text-center text-blue-600 font-semibold mb-4">
-          Saving...
-        </div>
-      )}
+      <div className="mb-4 flex items-center gap-2">
+        <input
+          type="email"
+          placeholder="Recipient email"
+          className="border px-3 py-2 rounded w-64"
+          value={recipient}
+          onChange={(e) => setRecipient(e.target.value)}
+        />
+        <Button
+          onClick={handleSendEmail}
+          className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+        >
+          <Mail size={16} /> Send Table
+        </Button>
+      </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full border border-gray-300 rounded-lg">
           <thead className="bg-gray-100">
             <tr>
               <th className="border px-4 py-2 text-left">Equipment</th>
+              <th className="border px-4 py-2 text-left">Total</th>
               {sites.map((site) => (
-                <th key={site.id} className="border px-4 py-2 text-left">
-                  {site.site_name}
-                </th>
+                <th key={site.id} className="border px-4 py-2 text-left">{site.site_name}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {equipmentRows.map((row, rowIndex) => (
-              <tr key={rowIndex}>
-                <td className="border px-4 py-2 font-medium">{row.name}</td>
-                {sites.map((site) => (
-                  <td key={site.id} className="border px-4 py-2">
-                    {editing ? (
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={row.quantities[site.site_name] ?? ""}
-                        onChange={(e) => handleCellChange(rowIndex, site.site_name, e.target.value)}
-                        className="border px-2 py-1 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={saving}
-                      />
-                    ) : (
-                      (row.quantities[site.site_name] === "" ? 0 : Number(row.quantities[site.site_name] ?? 0))
-                    )}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {equipmentRows.map((row, i) => {
+              const quantities = row.quantities || {};
+              const total = Object.values(quantities).reduce((sum, val) => sum + Number(val || 0), 0);
+              return (
+                <tr key={i}>
+                  <td className="border px-4 py-2 font-medium">{row.name}</td>
+                  <td className="border px-4 py-2">{total}</td>
+                  {sites.map((site) => (
+                    <td key={site.id} className="border px-4 py-2">{Number(quantities[site.site_name] || 0)}</td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -214,4 +226,4 @@ const EditableEquipmentTable: React.FC = () => {
   );
 };
 
-export default EditableEquipmentTable;
+export default AllInventory;
