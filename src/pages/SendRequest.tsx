@@ -113,20 +113,25 @@ const SendRequest: React.FC = () => {
     }
 
     try {
-      const isRental = type === "rent" || type === "return";
+      // Ensure type is valid for DB check constraint
+      const requestType: "buy" | "sell" | "return" = type === "rent" ? "buy" : type;
+const isRental = type === "rent";
 
-      const { error } = await supabase.from("equipment_requests").insert([
-        {
-          supervisor_id: user.id,
-          site_id: selectedSiteId,
-          equipment_id: selectedEquipment ? Number(selectedEquipment) : null,
-          equipment_name: selectedEquipment ? undefined : customEquipment.trim(),
-          quantity,
-          type,
-          isRental,
-          status: "pending",
-        },
-      ]);
+const equipmentId = selectedEquipment ? Number(selectedEquipment) : null;
+const equipmentName = !selectedEquipment && customEquipment.trim() ? customEquipment.trim() : null;
+
+const { error } = await supabase.from("equipment_requests").insert([
+  {
+    supervisor_id: user.id,
+    site_id: selectedSiteId,
+    equipment_id: equipmentId,
+    equipment_name: equipmentName,
+    quantity,
+    type: requestType,
+    isRental,
+    status: "pending",
+  },
+]);
 
       if (error) {
         console.error("Error creating request:", error);
@@ -231,10 +236,14 @@ const SendRequest: React.FC = () => {
                   if (!selectedSiteId) return false;
                   const siteName = userSites.find(s => s.id === selectedSiteId)?.site_name;
                   switch (type) {
-                    case "buy": return true;
-                    case "sell": return eq.site_name === siteName && !eq.isRental;
-                    case "rent": return true;
-                    case "return": return eq.site_name === siteName && eq.isRental;
+                    case "buy":
+                      return true;
+                    case "sell":
+                      return eq.site_name === siteName && !eq.isRental;
+                    case "rent":
+                      return true;
+                    case "return":
+                      return eq.site_name === siteName && eq.isRental;
                   }
                 })
                 .reduce((acc: Record<string, { name: string; ids: number[] }>, eq) => {
@@ -244,7 +253,7 @@ const SendRequest: React.FC = () => {
                 }, {})
             ).map(group => (
               <option key={group.name} value={group.ids[0]}>
-                {group.name} {type === "rent" ? "(Rental)" : ""}
+                {group.name}
               </option>
             ))}
           </select>
