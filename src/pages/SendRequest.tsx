@@ -57,7 +57,6 @@ const SendRequest: React.FC = () => {
       return;
     }
     
-    // Transform the data to include site_name
     const transformedData = (data || []).map((eq: any) => ({
       id: eq.id,
       name: eq.name,
@@ -73,17 +72,14 @@ const SendRequest: React.FC = () => {
       if (!user?.id) return;
 
       try {
-        // Get user's sites
         const sites = await fetchUserSites(user.id);
         setUserSites(sites);
 
-        // Set initial site if available
         if (sites.length > 0) {
           const initialSiteId = sites[0].id;
           setSelectedSiteId(initialSiteId);
         }
 
-        // Fetch all equipment
         await fetchAllEquipment();
       } catch (err) {
         console.error("Error initializing data:", err);
@@ -95,11 +91,10 @@ const SendRequest: React.FC = () => {
     initializeData();
   }, [user]);
 
-  // Handle site selection change
   const handleSiteChange = (siteId: string) => {
     setSelectedSiteId(siteId);
-    setSelectedEquipment(""); // Reset equipment selection
-    setCustomEquipment(""); // Reset custom equipment
+    setSelectedEquipment("");
+    setCustomEquipment("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,15 +104,12 @@ const SendRequest: React.FC = () => {
       return;
     }
 
-    // Validation based on type
     if (type === "buy") {
-      // For buy, either select existing equipment or enter custom name
       if (!selectedEquipment && !customEquipment.trim()) {
         alert("Please select existing equipment or enter a custom equipment name");
         return;
       }
     } else {
-      // For sell/return/rent, must select existing equipment
       if (!selectedEquipment) {
         alert(`Please select existing equipment to ${type}`);
         return;
@@ -130,14 +122,15 @@ const SendRequest: React.FC = () => {
     }
 
     try {
-      // Determine if this is a rental based on type or selected equipment
-      let isRental = false;
-      if (type === "rent" || type === "return") {
-        isRental = true;
-      } else if (selectedEquipment) {
-        // Check if selected equipment is rental
+      // ✅ Map rent → buy + isRental=true
+      let requestType: "buy" | "sell" | "return" = type === "rent" ? "buy" : type;
+      let isRental = type === "rent" || type === "return";
+
+      if (selectedEquipment) {
         const selectedEq = equipmentList.find(eq => eq.id.toString() === selectedEquipment);
-        isRental = selectedEq?.isRental || false;
+        if (selectedEq) {
+          isRental = type === "rent" || type === "return" || selectedEq.isRental;
+        }
       }
 
       const { error } = await supabase.from("equipment_requests").insert([
@@ -147,8 +140,8 @@ const SendRequest: React.FC = () => {
           equipment_id: selectedEquipment ? Number(selectedEquipment) : null,
           equipment_name: selectedEquipment ? undefined : customEquipment.trim(),
           quantity,
-          type,
-          isRental,
+          type: requestType,   // 👈 DB safe
+          isRental,            // 👈 rental flag
           status: "pending",
         },
       ]);
@@ -158,11 +151,9 @@ const SendRequest: React.FC = () => {
         alert("❌ Failed to send request");
       } else {
         alert("✅ Request submitted to admin");
-        // Reset form
         setSelectedEquipment("");
         setCustomEquipment("");
         setQuantity(1);
-        // Navigate back to supervisor dashboard
         navigate("/supervisor");
       }
     } catch (err) {
@@ -235,7 +226,6 @@ const SendRequest: React.FC = () => {
             value={type}
             onChange={(e) => {
               setType(e.target.value as "buy" | "sell" | "return" | "rent");
-              // Reset equipment selection when type changes
               setSelectedEquipment("");
               setCustomEquipment("");
             }}
@@ -251,14 +241,12 @@ const SendRequest: React.FC = () => {
         {/* Equipment Selection */}
         <div>
           <label className="block mb-1 font-medium text-gray-700">Equipment</label>
-          
-          {/* Show dropdown for existing equipment (always for sell/return/rent, optional for buy) */}
           {(type === "sell" || type === "return" || type === "rent" || type === "buy") && (
             <select
               value={selectedEquipment}
               onChange={(e) => {
                 setSelectedEquipment(e.target.value);
-                if (e.target.value) setCustomEquipment(""); // Clear custom if selecting existing
+                if (e.target.value) setCustomEquipment("");
               }}
               className="w-full border border-gray-300 rounded-lg p-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -266,7 +254,6 @@ const SendRequest: React.FC = () => {
                 {type === "buy" ? "Select existing equipment (optional)" : `Select equipment to ${type}`}
               </option>
               {(() => {
-                // Group equipment by name, type (rental vs owned), and site
                 const groupedEquipment = equipmentList.reduce((acc, eq) => {
                   const key = `${eq.name}_${eq.isRental ? 'rental' : 'owned'}_${eq.site_name}`;
                   if (!acc[key]) {
@@ -290,7 +277,6 @@ const SendRequest: React.FC = () => {
             </select>
           )}
 
-          {/* Show custom input for buy type */}
           {type === "buy" && (
             <input
               type="text"
@@ -298,20 +284,10 @@ const SendRequest: React.FC = () => {
               value={customEquipment}
               onChange={(e) => {
                 setCustomEquipment(e.target.value);
-                if (e.target.value) setSelectedEquipment(""); // Clear selection if typing custom
+                if (e.target.value) setSelectedEquipment("");
               }}
               className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          )}
-
-          {type === "sell" || type === "return" || type === "rent" ? (
-            <p className="text-sm text-gray-500 mt-1">
-              You must select existing equipment from your site to {type}.
-            </p>
-          ) : (
-            <p className="text-sm text-gray-500 mt-1">
-              Select existing equipment or enter a custom name for new equipment.
-            </p>
           )}
         </div>
 
@@ -326,7 +302,6 @@ const SendRequest: React.FC = () => {
             className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-
 
         <div className="flex space-x-3">
           <button
@@ -349,4 +324,3 @@ const SendRequest: React.FC = () => {
 };
 
 export default SendRequest;
-
