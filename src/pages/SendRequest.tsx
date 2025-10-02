@@ -8,12 +8,19 @@ interface Site {
   site_name: string;
 }
 
+interface Equipment {
+  id: number;
+  name: string;
+  isRental: boolean;
+  site_name: string;
+}
+
 const SendRequest: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [type, setType] = useState<"buy" | "sell" | "return" | "rent">("buy");
-  const [equipmentList, setEquipmentList] = useState<{ id: number; name: string; isRental: boolean; site_name: string }[]>([]);
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [selectedEquipment, setSelectedEquipment] = useState<string>("");
   const [customEquipment, setCustomEquipment] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
@@ -23,72 +30,55 @@ const SendRequest: React.FC = () => {
 
   // Fetch user sites
   const fetchUserSites = async (userId: string) => {
-    try {
-      const { data: sitesData, error } = await supabase
-        .from("construction_sites")
-        .select("id, site_name")
-        .eq("supervisor_id", userId);
-
-      if (error) {
-        console.error("Error fetching user sites:", error.message);
-        return [];
-      }
-
-      return sitesData || [];
-    } catch (err) {
-      console.error("Unexpected error while fetching sites:", err);
+    const { data: sitesData, error } = await supabase
+      .from("construction_sites")
+      .select("id, site_name")
+      .eq("supervisor_id", userId);
+    if (error) {
+      console.error("Error fetching user sites:", error.message);
       return [];
     }
+    return sitesData || [];
   };
 
-  // Fetch all equipment with site information
+  // Fetch all equipment
   const fetchAllEquipment = async () => {
     const { data, error } = await supabase
       .from("equipment")
       .select(`
-        id, 
-        name, 
+        id,
+        name,
         isRental,
         site:site_id(site_name)
       `);
-    
     if (error) {
       console.error("Error fetching equipment:", error);
       return;
     }
-    
-    const transformedData = (data || []).map((eq: any) => ({
+    const transformed = (data || []).map((eq: any) => ({
       id: eq.id,
       name: eq.name,
       isRental: eq.isRental,
       site_name: eq.site?.site_name || "Unknown Site"
     }));
-    
-    setEquipmentList(transformedData);
+    setEquipmentList(transformed);
   };
 
   useEffect(() => {
-    const initializeData = async () => {
+    const initialize = async () => {
       if (!user?.id) return;
-
       try {
         const sites = await fetchUserSites(user.id);
         setUserSites(sites);
-
-        if (sites.length > 0) {
-          const initialSiteId = sites[0].id;
-          setSelectedSiteId(initialSiteId);
-        }
-
+        if (sites.length > 0) setSelectedSiteId(sites[0].id);
         await fetchAllEquipment();
       } catch (err) {
-        console.error("Error initializing data:", err);
+        console.error("Initialization error:", err);
       } finally {
         setLoading(false);
       }
     };
-
-    initializeData();
+    initialize();
   }, [user]);
 
   const handleSiteChange = (siteId: string) => {
@@ -104,9 +94,10 @@ const SendRequest: React.FC = () => {
       return;
     }
 
-    if (type === "buy") {
+    // Validation
+    if (type === "buy" || type === "rent") {
       if (!selectedEquipment && !customEquipment.trim()) {
-        alert("Please select existing equipment or enter a custom equipment name");
+        alert("Please select existing equipment or enter custom name");
         return;
       }
     } else {
@@ -122,16 +113,7 @@ const SendRequest: React.FC = () => {
     }
 
     try {
-      // ✅ Map rent → buy + isRental=true
-      let requestType: "buy" | "sell" | "return" = type === "rent" ? "buy" : type;
-      let isRental = type === "rent" || type === "return";
-
-      if (selectedEquipment) {
-        const selectedEq = equipmentList.find(eq => eq.id.toString() === selectedEquipment);
-        if (selectedEq) {
-          isRental = type === "rent" || type === "return" || selectedEq.isRental;
-        }
-      }
+      const isRental = type === "rent" || type === "return";
 
       const { error } = await supabase.from("equipment_requests").insert([
         {
@@ -140,8 +122,8 @@ const SendRequest: React.FC = () => {
           equipment_id: selectedEquipment ? Number(selectedEquipment) : null,
           equipment_name: selectedEquipment ? undefined : customEquipment.trim(),
           quantity,
-          type: requestType,   // 👈 DB safe
-          isRental,            // 👈 rental flag
+          type,
+          isRental,
           status: "pending",
         },
       ]);
@@ -150,7 +132,7 @@ const SendRequest: React.FC = () => {
         console.error("Error creating request:", error);
         alert("❌ Failed to send request");
       } else {
-        alert("✅ Request submitted to admin");
+        alert("✅ Request submitted");
         setSelectedEquipment("");
         setCustomEquipment("");
         setQuantity(1);
@@ -202,7 +184,7 @@ const SendRequest: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Site Selection */}
+        {/* Site */}
         <div>
           <label className="block mb-1 font-medium text-gray-700">Construction Site</label>
           <select
@@ -211,24 +193,16 @@ const SendRequest: React.FC = () => {
             className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Select a site...</option>
-            {userSites.map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.site_name}
-              </option>
-            ))}
+            {userSites.map(site => <option key={site.id} value={site.id}>{site.site_name}</option>)}
           </select>
         </div>
 
-        {/* Type Selector */}
+        {/* Type */}
         <div>
           <label className="block mb-1 font-medium text-gray-700">Type</label>
           <select
             value={type}
-            onChange={(e) => {
-              setType(e.target.value as "buy" | "sell" | "return" | "rent");
-              setSelectedEquipment("");
-              setCustomEquipment("");
-            }}
+            onChange={(e) => { setType(e.target.value as any); setSelectedEquipment(""); setCustomEquipment(""); }}
             className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="buy">Buy</option>
@@ -238,55 +212,50 @@ const SendRequest: React.FC = () => {
           </select>
         </div>
 
-        {/* Equipment Selection */}
+        {/* Equipment */}
         <div>
           <label className="block mb-1 font-medium text-gray-700">Equipment</label>
-          {(type === "sell" || type === "return" || type === "rent" || type === "buy") && (
-            <select
-              value={selectedEquipment}
-              onChange={(e) => {
-                setSelectedEquipment(e.target.value);
-                if (e.target.value) setCustomEquipment("");
-              }}
-              className="w-full border border-gray-300 rounded-lg p-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">
-                {type === "buy" ? "Select existing equipment (optional)" : `Select equipment to ${type}`}
-              </option>
-              {(() => {
-                const groupedEquipment = equipmentList.reduce((acc, eq) => {
-                  const key = `${eq.name}_${eq.isRental ? 'rental' : 'owned'}_${eq.site_name}`;
-                  if (!acc[key]) {
-                    acc[key] = {
-                      name: eq.name,
-                      isRental: eq.isRental,
-                      site_name: eq.site_name,
-                      ids: []
-                    };
+
+          <select
+            value={selectedEquipment}
+            onChange={(e) => { setSelectedEquipment(e.target.value); if (type === "buy" || type === "rent") setCustomEquipment(""); }}
+            className="w-full border border-gray-300 rounded-lg p-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">
+              {type === "buy" || type === "rent" ? "Select existing equipment (optional)" : `Select equipment to ${type}`}
+            </option>
+
+            {Object.values(
+              equipmentList
+                .filter(eq => {
+                  if (!selectedSiteId) return false;
+                  const siteName = userSites.find(s => s.id === selectedSiteId)?.site_name;
+                  switch (type) {
+                    case "buy": return true;
+                    case "sell": return eq.site_name === siteName && !eq.isRental;
+                    case "rent": return true;
+                    case "return": return eq.site_name === siteName && eq.isRental;
                   }
-                  acc[key].ids.push(eq.id);
+                })
+                .reduce((acc: Record<string, { name: string; ids: number[] }>, eq) => {
+                  if (!acc[eq.name]) acc[eq.name] = { name: eq.name, ids: [] };
+                  acc[eq.name].ids.push(eq.id);
                   return acc;
-                }, {} as Record<string, { name: string; isRental: boolean; site_name: string; ids: number[] }>);
+                }, {})
+            ).map(group => (
+              <option key={group.name} value={group.ids[0]}>
+                {group.name} {type === "rent" ? "(Rental)" : ""}
+              </option>
+            ))}
+          </select>
 
-                return Object.entries(groupedEquipment).map(([key, group]) => (
-                  <option key={key} value={group.ids[0]}>
-                    {group.name} {group.isRental ? '(Rental)' : '(Owned)'} - {group.site_name}
-                  </option>
-                ));
-              })()}
-            </select>
-          )}
-
-          {type === "buy" && (
+          {(type === "buy" || type === "rent") && (
             <input
               type="text"
               placeholder="Or enter custom equipment name"
               value={customEquipment}
-              onChange={(e) => {
-                setCustomEquipment(e.target.value);
-                if (e.target.value) setSelectedEquipment("");
-              }}
-              className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => { setCustomEquipment(e.target.value); setSelectedEquipment(""); }}
+              className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
             />
           )}
         </div>
@@ -298,11 +267,12 @@ const SendRequest: React.FC = () => {
             type="number"
             min={1}
             value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
+            onChange={e => setQuantity(Number(e.target.value))}
             className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
+        {/* Buttons */}
         <div className="flex space-x-3">
           <button
             type="button"
