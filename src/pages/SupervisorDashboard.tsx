@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.ts";
 import { useNavigate, Link } from "react-router-dom";
-import { EquipmentTransfer } from "../lib/supabase.ts";
+import { EquipmentTransfer, EquipmentRequest } from "../lib/supabase.ts";
 
 // Loader Component
 const Loader: React.FC = () => (
@@ -23,8 +23,10 @@ const Dashboard: React.FC = () => {
   const [rentalEquipment, setRentalEquipment] = useState<any[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+  const [outgoingAdminRequests, setOutgoingAdminRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Refresh incoming requests (to selected site)
@@ -94,6 +96,53 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Refresh equipment requests sent to admin (created by this supervisor for selected site)
+  const refreshOutgoingAdminRequests = async (siteId: string, supervisorId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("equipment_requests")
+        .select(`
+          id,
+          equipment_id,
+          equipment:equipment_id(name, isRental),
+          equipment_name,
+          quantity,
+          isRental,
+          status,
+          created_at,
+          type
+        `)
+        .eq("site_id", siteId)
+        .eq("supervisor_id", supervisorId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching outgoing admin requests:", error.message);
+        return;
+      }
+
+      // Normalize for rendering similar to transfers
+      const normalized = (data || []).map((req: any) => ({
+        kind: "admin_request",
+        id: req.id,
+        quantity: req.quantity,
+        status: req.status,
+        requested_at: req.created_at,
+        equipment: {
+          name: req.equipment?.name || req.equipment_name || "Unknown Equipment",
+          isRental: typeof req.isRental === "boolean" ? req.isRental : req.equipment?.isRental,
+        },
+        to_label: "Admin",
+        type: req.type,
+      }));
+
+      setOutgoingAdminRequests(normalized);
+    } catch (err) {
+      console.error("Unexpected error while fetching outgoing admin requests:", err);
+    }
+  };
+
   // Refresh equipment for selected site
   const refreshEquipment = async (siteId: string) => {
     const { data: equipmentData, error: eqError } = await supabase
@@ -149,6 +198,9 @@ const Dashboard: React.FC = () => {
       await refreshEquipment(siteId);
       await refreshRequests(siteId);
       await refreshOutgoingRequests(siteId);
+      if (currentUserId) {
+        await refreshOutgoingAdminRequests(siteId, currentUserId);
+      }
     }
   };
 
@@ -186,6 +238,7 @@ const Dashboard: React.FC = () => {
       }
 
       const userId = userRow.id; // matches supervisor_id in construction_sites
+      setCurrentUserId(userId);
 
       // Fetch sites using users.id
       const sites = await fetchUserSites(userId);
@@ -198,6 +251,7 @@ const Dashboard: React.FC = () => {
         await refreshEquipment(initialSiteId);
         await refreshRequests(initialSiteId);
         await refreshOutgoingRequests(initialSiteId);
+        await refreshOutgoingAdminRequests(initialSiteId, userId);
       } else {
         console.warn("User has no sites assigned.");
       }
@@ -319,6 +373,32 @@ const Dashboard: React.FC = () => {
       }
     } catch (err: any) {
       alert("Error cancelling transfer: " + err.message);
+      console.error(err);
+    }
+  };
+
+  const handleCancelAdminRequest = async (reqId: string) => {
+    try {
+      const ok = window.confirm("Are you sure you want to cancel this request?");
+      if (!ok) return;
+
+      const { error } = await supabase
+        .from("equipment_requests")
+        .delete()
+        .eq("id", reqId)
+        .eq("status", "pending");
+
+      if (error) {
+        alert("Error cancelling request: " + error.message);
+        console.error(error);
+        return;
+      }
+
+      if (selectedSiteId && currentUserId) {
+        await refreshOutgoingAdminRequests(selectedSiteId, currentUserId);
+      }
+    } catch (err: any) {
+      alert("Error cancelling request: " + err.message);
       console.error(err);
     }
   };
@@ -582,10 +662,11 @@ const Dashboard: React.FC = () => {
             <div className="mb-6">
               <h2 className="text-xl font-bold text-blue-700 mb-4">Outgoing Requests</h2>
               <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
-                {outgoingRequests.length === 0 ? (
+                {outgoingRequests.length === 0 && outgoingAdminRequests.length === 0 ? (
                   <p className="text-gray-500">No outgoing requests.</p>
                 ) : (
-                  outgoingRequests.map((req) => (
+                  <>
+                  {outgoingRequests.map((req) => (
                     <div key={req.id} className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="font-medium text-gray-700">
@@ -621,7 +702,41 @@ const Dashboard: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  ))
+                  ))}
+
+                  {/* Outgoing requests to Admin */}
+                  {outgoingAdminRequests.map((req: any) => (
+                    <div key={req.id} className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-medium text-gray-700">
+                          {req.equipment?.name || "Unknown Equipment"}
+                        </span>
+                        {req.equipment?.isRental && (
+                          <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                            Rental
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-sm text-gray-500">Quantity: {req.quantity ?? "N/A"}</span>
+                      <span className="text-sm text-gray-500">To: Admin</span>
+                      <span className="text-sm text-gray-500">Status: {req.status}</span>
+                      <span className="text-xs text-gray-400">
+                        Requested: {new Date(req.requested_at).toLocaleString()}
+                      </span>
+
+                      {req.status === "pending" && (
+                        <div className="mt-2">
+                          <button
+                            className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+                            onClick={() => handleCancelAdminRequest(req.id)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  </>
                 )}
               </div>
             </div>
