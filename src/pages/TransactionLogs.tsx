@@ -9,6 +9,7 @@ interface TransactionLog {
   to_site_name: string;
   requested_at: string;
   requested_by: { username: string | null; email: string };
+  equipment_name: string;
   accepted: boolean;
   comment: string | null;
   quantity: number;
@@ -24,7 +25,7 @@ export default function TransactionLogs() {
   useEffect(() => {
     const fetchLogs = async () => {
       if (!user) return;
-      
+
       setLoading(true);
 
       let query = supabase
@@ -35,15 +36,15 @@ export default function TransactionLogs() {
           to_site:to_site_id (site_name),
           requested_at,
           requested_by:requested_by (username, email),
+          equipment:equipment_id (name),
           accepted,
           comment,
           quantity,
           status
         `);
 
-      // If user is supervisor, filter by their sites
+      // Filter for supervisors
       if (user.role === 'supervisor') {
-        // First, get all sites supervised by this user
         const { data: userSites, error: sitesError } = await supabase
           .from("construction_sites")
           .select("id")
@@ -57,16 +58,13 @@ export default function TransactionLogs() {
 
         if (userSites && userSites.length > 0) {
           const siteIds = userSites.map(site => site.id);
-          // Filter transactions where either from_site_id or to_site_id is in user's sites
           query = query.or(`from_site_id.in.(${siteIds.join(',')}),to_site_id.in.(${siteIds.join(',')})`);
         } else {
-          // User has no sites, show empty results
           setLogs([]);
           setLoading(false);
           return;
         }
       }
-      // If user is admin, show all transactions (no additional filtering)
 
       const { data, error } = await query;
 
@@ -82,6 +80,7 @@ export default function TransactionLogs() {
         to_site_name: log.to_site?.site_name || "Unknown",
         requested_at: log.requested_at,
         requested_by: log.requested_by || { username: null, email: "Unknown" },
+        equipment_name: log.equipment?.name || "Unknown",
         accepted: log.accepted,
         comment: log.comment,
         quantity: log.quantity,
@@ -149,6 +148,7 @@ export default function TransactionLogs() {
                   <th className="px-4 py-2 border">To Site</th>
                   <th className="px-4 py-2 border">Requested At</th>
                   <th className="px-4 py-2 border">Requested By</th>
+                  <th className="px-4 py-2 border">Equipment</th>
                   <th className="px-4 py-2 border">Quantity</th>
                   <th className="px-4 py-2 border">Comment</th>
                   <th className="px-4 py-2 border">Accepted</th>
@@ -166,6 +166,7 @@ export default function TransactionLogs() {
                     <td className="px-4 py-2 border">
                       {log.requested_by?.username || log.requested_by?.email}
                     </td>
+                    <td className="px-4 py-2 border">{log.equipment_name}</td>
                     <td className="px-4 py-2 border">{log.quantity}</td>
                     <td className="px-4 py-2 border">{log.comment || "-"}</td>
                     <td className="px-4 py-2 border">{log.accepted ? "✔" : "✘"}</td>
@@ -199,6 +200,9 @@ export default function TransactionLogs() {
                 <p className="text-sm">
                   <span className="font-semibold">By:</span>{" "}
                   {log.requested_by?.username || log.requested_by?.email}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Equipment:</span> {log.equipment_name}
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold">Quantity:</span>{" "}
