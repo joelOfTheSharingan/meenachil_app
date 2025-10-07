@@ -458,7 +458,7 @@ const Dashboard: React.FC = () => {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
-              <span>New Request</span>
+              <span>Transfer</span>
             </Link>
             <Link
           to="/send-request"
@@ -478,7 +478,7 @@ const Dashboard: React.FC = () => {
               d="M12 4v16m8-8H4"
             />
           </svg>
-          <span>Send Request</span>
+          <span>Buy Equipment</span>
           </Link>
 
           </nav>
