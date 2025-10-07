@@ -23,6 +23,7 @@ const NewRequests: React.FC = () => {
   const [selectedEquipment, setSelectedEquipment] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
   const [maxQuantity, setMaxQuantity] = useState<number>(1);
+  const [vehicleNumber, setVehicleNumber] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
   // Fetch supervisor's sites
@@ -124,7 +125,17 @@ const NewRequests: React.FC = () => {
   // Handle submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fromSiteId || !user?.id || !selectedEquipment || !toSiteId || quantity <= 0) return;
+    if (
+      !fromSiteId ||
+      !user?.id ||
+      !selectedEquipment ||
+      !toSiteId ||
+      quantity <= 0 ||
+      vehicleNumber.length > 13
+    ) {
+      alert("Please fill all fields correctly. Vehicle number must be <= 13 characters.");
+      return;
+    }
 
     setLoading(true);
     const { error } = await supabase.from("equipment_transfers").insert([
@@ -135,6 +146,7 @@ const NewRequests: React.FC = () => {
         requested_by: user.id,
         status: "pending",
         quantity,
+        vehicle_number: vehicleNumber, // added here
       },
     ]);
     setLoading(false);
@@ -200,30 +212,41 @@ const NewRequests: React.FC = () => {
         <div>
           <label className="block text-sm font-medium mb-1">Equipment to Transfer</label>
           <select
-  value={selectedEquipment}
-  onChange={(e) => setSelectedEquipment(e.target.value)}
-  required
-  className="w-full border rounded-lg p-2"
->
-  <option value="">Select equipment</option>
-  {/* Non-rental first */}
-  {equipmentList
-    .filter((eq) => eq.type === "nonRental" && eq.total > 0)
-    .map((eq) => (
-      <option key={eq.id} value={eq.id}>
-        {eq.name} (Available: {eq.total})
-      </option>
-    ))}
-  {/* Rentals */}
-  {equipmentList
-    .filter((eq) => eq.type === "rental" && eq.total > 0)
-    .map((eq) => (
-      <option key={eq.id} value={eq.id}>
-        {eq.name} (Rental Available: {eq.total})
-      </option>
-    ))}
-</select>
+            value={selectedEquipment}
+            onChange={(e) => setSelectedEquipment(e.target.value)}
+            required
+            className="w-full border rounded-lg p-2"
+          >
+            <option value="">Select equipment</option>
+            {equipmentList
+              .filter((eq) => eq.type === "nonRental" && eq.total > 0)
+              .map((eq) => (
+                <option key={eq.id} value={eq.id}>
+                  {eq.name} (Available: {eq.total})
+                </option>
+              ))}
+            {equipmentList
+              .filter((eq) => eq.type === "rental" && eq.total > 0)
+              .map((eq) => (
+                <option key={eq.id} value={eq.id}>
+                  {eq.name} (Rental Available: {eq.total})
+                </option>
+              ))}
+          </select>
+        </div>
 
+        {/* Vehicle Number */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Vehicle Number</label>
+          <input
+            type="text"
+            value={vehicleNumber}
+            onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
+            maxLength={13}
+            placeholder="Enter vehicle number"
+            required
+            className="w-full border rounded-lg p-2"
+          />
         </div>
 
         {/* Quantity */}

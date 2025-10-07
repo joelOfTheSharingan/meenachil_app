@@ -43,7 +43,7 @@ export type Equipment = {
   name: string;
   status: "available" | "in use" | "transferring";
   site_id: string;
-  isRental: boolean; 
+  isRental: boolean;
   quantity: number; // ✅ Track quantity directly
 };
 
@@ -60,6 +60,7 @@ export type EquipmentTransfer = {
   quantity: number; // number being moved
   status: "pending" | "approved" | "rejected";
   comment?: string; // optional comment
+  vehicle_number?: string; // NEW: max 13 chars
   created_at: string;
 };
 

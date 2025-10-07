@@ -41,6 +41,7 @@ const Dashboard: React.FC = () => {
           status,
           accepted,
           comment,
+          vehicle_number,
           equipment(name, isRental),
           from_site_id,
           to_site_id,
@@ -74,6 +75,7 @@ const Dashboard: React.FC = () => {
           status,
           accepted,
           comment,
+          vehicle_number,
           equipment(name, isRental),
           from_site_id,
           to_site_id,
@@ -615,6 +617,7 @@ const Dashboard: React.FC = () => {
                         <span className="font-medium text-gray-700">
                           {req.equipment?.name || "Unknown Equipment"}
                         </span>
+                        
                         {req.equipment?.isRental && (
                           <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
                             Rental
@@ -628,6 +631,11 @@ const Dashboard: React.FC = () => {
                         From: {req.from_site?.site_name || "Unknown Site"}
                       </span>
                       <span className="text-sm text-gray-500">Status: {req.status}</span>
+                      {req.vehicle_number && (
+                          <span className="text-sm text-gray-500">
+                            Vehicle:{req.vehicle_number}
+                          </span>
+                        )}
                       <span className="text-xs text-gray-400">
                         Requested: {new Date(req.requested_at).toLocaleString()}
                       </span>
@@ -672,6 +680,7 @@ const Dashboard: React.FC = () => {
                         <span className="font-medium text-gray-700">
                           {req.equipment?.name || "Unknown Equipment"}
                         </span>
+                        
                         {req.equipment?.isRental && (
                           <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
                             Rental
@@ -683,6 +692,12 @@ const Dashboard: React.FC = () => {
                         To: {req.to_site?.site_name || "Unknown Site"}
                       </span>
                       <span className="text-sm text-gray-500">Status: {req.status}</span>
+                      {req.vehicle_number && (
+                          <span className="text-sm text-gray-500 whitespace-nowrap overflow-x-auto">
+  Vehicle: {req.vehicle_number}
+</span>
+
+                        )}
                       <span className="text-xs text-gray-400">
                         Requested: {new Date(req.requested_at).toLocaleString()}
                       </span>
@@ -720,6 +735,7 @@ const Dashboard: React.FC = () => {
                       <span className="text-sm text-gray-500">Quantity: {req.quantity ?? "N/A"}</span>
                       <span className="text-sm text-gray-500">To: Admin</span>
                       <span className="text-sm text-gray-500">Status: {req.status}</span>
+                      
                       <span className="text-xs text-gray-400">
                         Requested: {new Date(req.requested_at).toLocaleString()}
                       </span>
