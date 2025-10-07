@@ -12,6 +12,7 @@ interface TransactionLog {
   equipment_name: string;
   accepted: boolean;
   comment: string | null;
+  vehicle_number?: string | null;
   quantity: number;
   status: "approved" | "pending" | "rejected" | "cancelled";
 }
@@ -37,6 +38,7 @@ export default function TransactionLogs() {
           requested_at,
           requested_by:requested_by (username, email),
           equipment:equipment_id (name),
+          vehicle_number,
           accepted,
           comment,
           quantity,
@@ -44,7 +46,7 @@ export default function TransactionLogs() {
         `);
 
       // Filter for supervisors
-      if (user.role === 'supervisor') {
+      if (user.role === "supervisor") {
         const { data: userSites, error: sitesError } = await supabase
           .from("construction_sites")
           .select("id")
@@ -57,8 +59,12 @@ export default function TransactionLogs() {
         }
 
         if (userSites && userSites.length > 0) {
-          const siteIds = userSites.map(site => site.id);
-          query = query.or(`from_site_id.in.(${siteIds.join(',')}),to_site_id.in.(${siteIds.join(',')})`);
+          const siteIds = userSites.map((site) => site.id);
+          query = query.or(
+            `from_site_id.in.(${siteIds.join(
+              ","
+            )}),to_site_id.in.(${siteIds.join(",")})`
+          );
         } else {
           setLogs([]);
           setLoading(false);
@@ -83,15 +89,16 @@ export default function TransactionLogs() {
         equipment_name: log.equipment?.name || "Unknown",
         accepted: log.accepted,
         comment: log.comment,
+        vehicle_number: log.vehicle_number,
         quantity: log.quantity,
         status: log.status,
       }));
 
-      // Sort: pending first, then by requested_at ascending
+      // Sort: pending first, then latest first (descending by requested_at)
       transformed.sort((a, b) => {
         if (a.status === "pending" && b.status !== "pending") return -1;
         if (a.status !== "pending" && b.status === "pending") return 1;
-        return new Date(a.requested_at).getTime() - new Date(b.requested_at).getTime();
+        return new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime();
       });
 
       setLogs(transformed);
@@ -120,7 +127,7 @@ export default function TransactionLogs() {
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">
           Transaction Logs
-          {user?.role === 'supervisor' && (
+          {user?.role === "supervisor" && (
             <span className="text-sm font-normal text-gray-600 ml-2">
               (Your Sites Only)
             </span>
@@ -140,6 +147,7 @@ export default function TransactionLogs() {
         <p className="text-gray-600">No transactions found.</p>
       ) : (
         <>
+          {/* Desktop Table */}
           <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow">
               <thead className="bg-gray-100">
@@ -151,6 +159,7 @@ export default function TransactionLogs() {
                   <th className="px-4 py-2 border">Equipment</th>
                   <th className="px-4 py-2 border">Quantity</th>
                   <th className="px-4 py-2 border">Comment</th>
+                  <th className="px-4 py-2 border">Vehicle</th>
                   <th className="px-4 py-2 border">Accepted</th>
                   <th className="px-4 py-2 border">Status</th>
                 </tr>
@@ -169,10 +178,13 @@ export default function TransactionLogs() {
                     <td className="px-4 py-2 border">{log.equipment_name}</td>
                     <td className="px-4 py-2 border">{log.quantity}</td>
                     <td className="px-4 py-2 border">{log.comment || "-"}</td>
+                    <td className="px-4 py-2 border">{log.vehicle_number || "-"}</td>
                     <td className="px-4 py-2 border">{log.accepted ? "✔" : "✘"}</td>
                     <td className="px-4 py-2 border">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusClasses(log.status)}`}
+                        className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusClasses(
+                          log.status
+                        )}`}
                       >
                         {log.status}
                       </span>
@@ -183,6 +195,7 @@ export default function TransactionLogs() {
             </table>
           </div>
 
+          {/* Mobile Cards */}
           <div className="space-y-4 md:hidden">
             {logs.map((log) => (
               <div
@@ -205,23 +218,25 @@ export default function TransactionLogs() {
                   <span className="font-semibold">Equipment:</span> {log.equipment_name}
                 </p>
                 <p className="text-sm">
-                  <span className="font-semibold">Quantity:</span>{" "}
-                  {log.quantity}
+                  <span className="font-semibold">Quantity:</span> {log.quantity}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Vehicle:</span> {log.vehicle_number || "-"}
                 </p>
                 {log.comment && (
                   <p className="text-sm">
-                    <span className="font-semibold">Comment:</span>{" "}
-                    {log.comment}
+                    <span className="font-semibold">Comment:</span> {log.comment}
                   </p>
                 )}
                 <p className="text-sm">
-                  <span className="font-semibold">Accepted:</span>{" "}
-                  {log.accepted ? "✔" : "✘"}
+                  <span className="font-semibold">Accepted:</span> {log.accepted ? "✔" : "✘"}
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold">Status:</span>{" "}
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusClasses(log.status)}`}
+                    className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusClasses(
+                      log.status
+                    )}`}
                   >
                     {log.status}
                   </span>
