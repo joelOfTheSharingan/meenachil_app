@@ -48,37 +48,58 @@ export default function AssignSites() {
   };
 
   // Delete site with confirmation
-  const handleDeleteSite = async (siteId: string) => {
-    const site = sites.find(s => s.id === siteId);
-    const siteLabel = site ? site.site_name : "this site";
-    const ok = window.confirm(`Are you sure you want to delete "${siteLabel}"? This cannot be undone.`);
-    if (!ok) return;
+  // Delete site with confirmation and equipment check
+const handleDeleteSite = async (siteId: string) => {
+  const site = sites.find((s) => s.id === siteId);
+  const siteLabel = site ? site.site_name : "this site";
 
-    setDeletingId(siteId);
-    try {
-      const { error } = await supabase
-        .from("construction_sites")
-        .delete()
-        .eq("id", siteId);
+  // 1️⃣ Check if any equipment is linked to this site
+  const { data: equipment, error: equipError } = await supabase
+    .from("equipment")
+    .select("id")
+    .eq("site_id", siteId);
 
-      if (error) {
-        console.error("Error deleting site:", error);
-        alert("❌ Failed to delete site. It may have related data.");
-      } else {
-        alert("✅ Site deleted successfully");
-        setExpandedSiteId("");
-        await fetchSites();
-        if (selectedSite === siteId) {
-          setSelectedSite("");
-        }
+  if (equipError) {
+    console.error("Error checking equipment:", equipError);
+    alert("⚠️ Failed to check equipment for this site.");
+    return;
+  }
+
+  if (equipment && equipment.length > 0) {
+    // 2️⃣ Show alert and stop delete if site has equipment
+    alert("Site has equipment. Move it somewhere before deleting.");
+    return;
+  }
+
+  // 3️⃣ Ask for delete confirmation
+  const ok = window.confirm(`Are you sure you want to delete "${siteLabel}"? This cannot be undone.`);
+  if (!ok) return;
+
+  setDeletingId(siteId);
+  try {
+    const { error } = await supabase
+      .from("construction_sites")
+      .delete()
+      .eq("id", siteId);
+
+    if (error) {
+      console.error("Error deleting site:", error);
+      alert("❌ Failed to delete site. It may have related data.");
+    } else {
+      alert("✅ Site deleted successfully");
+      setExpandedSiteId("");
+      await fetchSites();
+      if (selectedSite === siteId) {
+        setSelectedSite("");
       }
-    } catch (err) {
-      console.error("Unexpected delete error:", err);
-      alert("❌ Failed to delete site");
-    } finally {
-      setDeletingId("");
     }
-  };
+  } catch (err) {
+    console.error("Unexpected delete error:", err);
+    alert("❌ Failed to delete site");
+  } finally {
+    setDeletingId("");
+  }
+};
 
   // Fetch supervisors list
   const fetchSupervisors = async () => {
