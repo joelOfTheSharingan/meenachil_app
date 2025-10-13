@@ -1,104 +1,209 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase.ts";
-import { EquipmentRequest } from "../lib/supabase.ts";
+// Mock supabase - replace with your actual import: import { supabase } from "../lib/supabase.ts";
+// Types
+interface Site {
+  site_name: string;
+}
+
+interface Supervisor {
+  email: string;
+}
+
+interface Equipment {
+  name: string;
+}
+
+interface EquipmentRequest {
+  id: string;
+  type: string;
+  equipment_name?: string;
+  quantity: number;
+  created_at: string;
+  isRental?: boolean;
+  status?: string;
+}
 
 interface RequestWithDetails extends EquipmentRequest {
+  site?: Site;
+  supervisor?: Supervisor;
+  equipment?: Equipment;
   site_name?: string;
   supervisor_email?: string;
+  supervisor_username?: string;
   equipment_name_from_table?: string;
 }
 
+interface NavButton {
+  label: string;
+  path: string;
+  color: string;
+  icon: React.ReactNode;
+}
+
+// Sidebar Component
+const Sidebar = ({ 
+  isOpen, 
+  onClose, 
+  navButtons 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  navButtons: NavButton[];
+}) => {
+  const navigate = useNavigate();
+
+  const handleNavClick = (path: string) => {
+    navigate(path);
+    onClose();
+  };
+
+  return (
+    <>
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={onClose}
+        />
+      )}
+
+      <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-50 ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-800">Admin Menu</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <nav className="space-y-2">
+            {navButtons.map((btn) => (
+              <button
+                key={btn.path}
+                onClick={() => handleNavClick(btn.path)}
+                className="w-full flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-md transition-colors"
+              >
+                {btn.icon}
+                <span>{btn.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// Loading Component
+const LoadingSpinner = () => (
+  <div className="flex justify-center py-4">
+    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+  </div>
+);
+
+// Empty State Component
+const EmptyState = () => (
+  <p className="text-gray-500 text-center py-4">No pending requests</p>
+);
+
+// Request Card Component
+const RequestCard = ({ 
+  request, 
+  onApprove,
+  onReject
+}: { 
+  request: RequestWithDetails; 
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+}) => {
+  const getTypeColor = (type: string) => {
+    const colors: Record<string, string> = {
+      buy: "bg-blue-100 text-blue-800",
+      sell: "bg-orange-100 text-orange-800",
+      rent: "bg-green-100 text-green-800",
+      return: "bg-purple-100 text-purple-800"
+    };
+    return colors[type] || "bg-gray-100 text-gray-800";
+  };
+
+  return (
+    <div className="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow flex justify-between items-center">
+      <div className="flex-1">
+        <div className="flex items-center space-x-2 mb-2">
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(request.type)}`}>
+            {request.type.toUpperCase()}
+          </span>
+          {request.isRental && (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              RENTAL
+            </span>
+          )}
+        </div>
+
+        <h4 className="font-medium text-gray-800 text-sm">
+          {request.equipment_name || request.equipment_name_from_table || "Unknown Equipment"}
+        </h4>
+
+        <div className="text-xs text-gray-600 space-y-1 mt-1">
+          <p><strong>Qty:</strong> {request.quantity}</p>
+          <p><strong>Site:</strong> {request.site_name || "Unknown"}</p>
+          <p><strong>From:</strong> {request.supervisor_username || "Unknown"}</p>
+          <p><strong>Date:</strong> {new Date(request.created_at).toLocaleDateString()}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col space-y-2 ml-4">
+        <button
+          onClick={() => onApprove(request.id)}
+          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+        >
+          Approve
+        </button>
+        <button
+          onClick={() => onReject(request.id)}
+          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+        >
+          Reject
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Quick Action Button Component
+const QuickActionButton = ({ 
+  button, 
+  onClick 
+}: { 
+  button: NavButton; 
+  onClick: () => void;
+}) => (
+  <button
+    onClick={onClick}
+    className={`text-white font-semibold px-4 py-2 rounded-lg transition duration-300 ${button.color} flex items-center space-x-3 justify-center`}
+  >
+    {button.icon}
+    <span>{button.label}</span>
+  </button>
+);
+
+// Main Admin Dashboard Component
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<RequestWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch pending equipment requests
-  const fetchPendingRequests = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("equipment_requests")
-        .select(`
-          *,
-          site:site_id(site_name),
-          supervisor:supervisor_id(email),
-          equipment:equipment_id(name)
-        `)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(5); // Show only 5 most recent pending requests
-
-      if (error) {
-        console.error("Error fetching pending requests:", error);
-        return;
-      }
-
-      // Transform the data to match our interface
-      const transformedData = (data || []).map((req: any) => ({
-        ...req,
-        site_name: req.site?.site_name,
-        supervisor_email: req.supervisor?.email,
-        equipment_name_from_table: req.equipment?.name,
-      }));
-
-      setPendingRequests(transformedData);
-    } catch (err) {
-      console.error("Unexpected error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPendingRequests();
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      // Get current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error("Error getting session:", sessionError.message);
-        return;
-      }
-
-      if (!session) {
-        console.warn("No active session to log out");
-      } else {
-        // Sign out
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-          console.error("Logout failed:", error.message);
-        } else {
-          console.log("Logged out successfully");
-        }
-      }
-
-      // Redirect user to login/home page regardless
-      navigate("/login"); // or use "/" if that's your home route
-    } catch (err: any) {
-      console.error("Unexpected logout error:", err.message);
-      navigate("/login"); // fallback redirect
-    }
-  };
-
-  // Shared button base styles
-  const baseBtn = "text-white font-semibold px-4 py-2 rounded-lg transition duration-300";
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "buy": return "bg-blue-100 text-blue-800";
-      case "sell": return "bg-orange-100 text-orange-800";
-      case "rent": return "bg-green-100 text-green-800";
-      case "return": return "bg-purple-100 text-purple-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
-
   // Navigation buttons configuration
-  const navButtons = [
+  const navButtons: NavButton[] = [
     { 
       label: "See All Equipment", 
       path: "/inventory", 
@@ -151,50 +256,90 @@ export default function AdminDashboard() {
     },
   ];
 
+  // Fetch pending equipment requests with useCallback
+  const fetchPendingRequests = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+  .from("equipment_requests")
+  .select(`
+    *,
+    site:site_id(site_name),
+    supervisor:supervisor_id(username),
+    equipment:equipment_id(name)
+  `)
+
+      if (error) throw error;
+
+      const transformedData = (data || []).map((req: any) => ({
+        ...req,
+        site_name: req.site?.site_name,
+        supervisor_username: req.supervisor?.username,
+        equipment_name_from_table: req.equipment?.name,
+      }));
+
+      setPendingRequests(transformedData);
+    } catch (err) {
+      console.error("Error fetching pending requests:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingRequests();
+  }, [fetchPendingRequests]);
+
+  // Simplified logout handler
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error("Logout failed:", error.message);
+    } finally {
+      navigate("/login");
+    }
+  };
+
+  // Handle inline approve/reject actions
+  const handleApprove = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("equipment_requests")
+        .update({ status: "approved" })
+        .eq("id", id);
+      
+      if (error) throw error;
+      
+      // Refresh the list
+      fetchPendingRequests();
+    } catch (err) {
+      console.error("Error approving request:", err);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("equipment_requests")
+        .update({ status: "rejected" })
+        .eq("id", id);
+      
+      if (error) throw error;
+      
+      // Refresh the list
+      fetchPendingRequests();
+    } catch (err) {
+      console.error("Error rejecting request:", err);
+    }
+  };
+
   return (
     <div className="relative">
-      {/* Sidebar Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+        navButtons={navButtons}
+      />
 
-      {/* Sidebar */}
-      <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-50 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-800">Admin Menu</h2>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <nav className="space-y-4">
-            {navButtons.map((btn) => (
-              <Link
-                key={btn.path}
-                to={btn.path}
-                className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-md transition-colors"
-                onClick={() => setSidebarOpen(false)}
-              >
-                {btn.icon}
-                <span>{btn.label}</span>
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </div>
-
-      {/* Main Content */}
       <div className="p-6 max-w-4xl mx-auto">
         <div className="bg-white shadow-lg rounded-xl p-6">
           {/* Header Section */}
@@ -204,18 +349,8 @@ export default function AdminDashboard() {
                 className="text-gray-600 focus:outline-none hover:text-gray-800 transition-colors"
                 onClick={() => setSidebarOpen(true)}
               >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M4 6h16M4 12h16M4 18h16"
-                  ></path>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
               <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
@@ -231,14 +366,11 @@ export default function AdminDashboard() {
           {/* Quick Actions Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {navButtons.map((btn) => (
-              <button
+              <QuickActionButton
                 key={btn.path}
+                button={btn}
                 onClick={() => navigate(btn.path)}
-                className={`${baseBtn} ${btn.color} flex items-center space-x-3 justify-center`}
-              >
-                {btn.icon}
-                <span>{btn.label}</span>
-              </button>
+              />
             ))}
           </div>
 
@@ -255,59 +387,18 @@ export default function AdminDashboard() {
             </div>
             
             {loading ? (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              </div>
+              <LoadingSpinner />
             ) : pendingRequests.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No pending requests</p>
+              <EmptyState />
             ) : (
               <div className="space-y-3">
                 {pendingRequests.map((request) => (
-                  <div
+                  <RequestCard
                     key={request.id}
-                    className="bg-white p-3 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(request.type)}`}>
-                            {request.type.toUpperCase()}
-                          </span>
-                          {request.isRental && (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              RENTAL
-                            </span>
-                          )}
-                        </div>
-                        
-                        <h4 className="font-medium text-gray-800 text-sm">
-                          {request.equipment_name || request.equipment_name_from_table || "Unknown Equipment"}
-                        </h4>
-                        
-                        <div className="text-xs text-gray-600 space-y-1">
-                          <p><strong>Qty:</strong> {request.quantity}</p>
-                          <p><strong>Site:</strong> {request.site_name || "Unknown"}</p>
-                          <p><strong>From:</strong> {request.supervisor_email || "Unknown"}</p>
-                          <p><strong>Date:</strong> {new Date(request.created_at).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex space-x-2 ml-4">
-                        <button
-                          onClick={() => navigate("/equipment-requests")}
-                          className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => navigate("/equipment-requests")}
-                          className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    request={request}
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                  />
                 ))}
               </div>
             )}

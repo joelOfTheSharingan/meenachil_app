@@ -14,6 +14,7 @@ interface RequestWithDetails extends EquipmentRequest {
   site_name?: string;
   supervisor_email?: string;
   equipment_name_from_table?: string;
+  supervisor_username?: string;
 }
 
 const EquipmentRequests: React.FC = () => {
@@ -31,7 +32,7 @@ const EquipmentRequests: React.FC = () => {
         .select(`
           *,
           site:site_id(site_name),
-          supervisor:supervisor_id(email),
+          supervisor:supervisor_id(username),
           equipment:equipment_id(name)
         `)
         .order("created_at", { ascending: false });
@@ -45,7 +46,7 @@ const EquipmentRequests: React.FC = () => {
       const transformedData = (data || []).map((req: any) => ({
         ...req,
         site_name: req.site?.site_name,
-        supervisor_email: req.supervisor?.email,
+        supervisor_username: req.supervisor?.username,
         equipment_name_from_table: req.equipment?.name,
       }));
 
@@ -415,13 +416,14 @@ const EquipmentRequests: React.FC = () => {
                       <div className="text-sm text-gray-600 space-y-1">
                         <p><strong>Quantity:</strong> {request.quantity}</p>
                         <p><strong>Site:</strong> {request.site_name || "Unknown Site"}</p>
-                        <p><strong>Supervisor:</strong> {request.supervisor_email || "Unknown"}</p>
+                        <p><strong>Supervisor:</strong> {request.supervisor_username || request.supervisor_email || "Unknown"}</p>
+
                         <p><strong>Requested:</strong> {new Date(request.created_at).toLocaleString()}</p>
                       </div>
                     </div>
 
                     {request.status === "pending" && (
-                      <div className="flex space-x-2 ml-4">
+                      <div className="flex flex-col space-y-2 ml-4">
                         <button
                           onClick={() => handleApprove(request)}
                           className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors"
@@ -436,6 +438,7 @@ const EquipmentRequests: React.FC = () => {
                         </button>
                       </div>
                     )}
+
                   </div>
                 </div>
               ))
