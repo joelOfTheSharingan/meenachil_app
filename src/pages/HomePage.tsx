@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase.ts';
 interface Profile {
   username: string;
   phone: string;
-  role?: 'admin' | 'supervisor';
+  role: 'admin' | 'supervisor';
 }
 
 const HomePage: React.FC = () => {
@@ -18,36 +18,38 @@ const HomePage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
-  const [redirected, setRedirected] = useState(false);
+  const [reloaded, setReloaded] = useState(false); // ensures reload only once
 
   // Fetch user profile
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!user || redirected) return;
+      if (!user) return;
 
       try {
         const { data, error: fetchError } = await supabase
           .from('users')
           .select('username, phone, role')
           .eq('id', user.id)
-          .single();
+          .maybeSingle(); // safer than single()
 
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          throw fetchError;
-        }
+        if (fetchError) throw fetchError;
 
         if (!data) {
           setLoading(false);
+          // Reload page **once** to ensure client-state sync
+          if (!reloaded) {
+            setReloaded(true);
+            window.location.reload();
+          }
           return;
         }
 
-        setProfile(data);
+        setProfile(data as Profile);
         setUsername(data.username || '');
         setPhone(data.phone || '');
 
-        // Redirect only if BOTH username and phone exist
+        // Redirect if profile is complete
         if (data.username && data.phone) {
-          setRedirected(true);
           const destination = data.role === 'admin' ? '/admin' : '/supervisor';
           navigate(destination, { replace: true });
         }
@@ -61,7 +63,7 @@ const HomePage: React.FC = () => {
     };
 
     fetchProfile();
-  }, [user, navigate, redirected]);
+  }, [user, navigate, reloaded]);
 
   // Submit profile update
   const handleProfileSubmit = async (e: React.FormEvent) => {
@@ -89,7 +91,7 @@ const HomePage: React.FC = () => {
             phone,
             role: 'supervisor', // default for new users
           },
-          { onConflict: 'id' } // remove 'returning'
+          { onConflict: 'id' } // safe upsert
         );
 
       if (upsertError) {
@@ -97,18 +99,15 @@ const HomePage: React.FC = () => {
         return;
       }
 
-      // Update local profile state
       const savedProfile = upsertedData?.[0] as Profile | undefined;
 
-if (savedProfile) {
-  setProfile(savedProfile);
-
-  // TypeScript now knows savedProfile is Profile
-  const destination = savedProfile.role === 'admin' ? '/admin' : '/supervisor';
-  navigate(destination, { replace: true });
-} else {
-  setError('Failed to save profile.');
-}
+      if (savedProfile) {
+        setProfile(savedProfile);
+        const destination = savedProfile.role === 'admin' ? '/admin' : '/supervisor';
+        navigate(destination, { replace: true });
+      } else {
+        setError('Failed to save profile.');
+      }
 
     } catch (err) {
       console.error('Unexpected error on profile submit:', err);
@@ -116,7 +115,7 @@ if (savedProfile) {
     }
   };
 
-  // Manual logout
+  // Logout
   const handleLogout = async () => {
     try {
       await signOut();
@@ -175,12 +174,12 @@ if (savedProfile) {
     );
   }
 
-  // Already complete profile → can show main page content here
+  // Already complete profile → show main page content
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold text-gray-800">Welcome, {profile.username}</h1>
       <p className="mt-2 text-gray-600">Your phone: {profile.phone}</p>
-      {/* Main dashboard content for users with complete profile */}
+      {/* Main dashboard content here */}
     </div>
   );
 };
