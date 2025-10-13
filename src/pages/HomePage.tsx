@@ -22,49 +22,46 @@ const HomePage: React.FC = () => {
 
   // Fetch user profile
   useEffect(() => {
-  const fetchProfile = async () => {
-    if (!user || redirected) return;
+    const fetchProfile = async () => {
+      if (!user || redirected) return;
 
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('users')
-        .select('username, phone, role')
-        .eq('id', user.id)
-        .single();
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('users')
+          .select('username, phone, role')
+          .eq('id', user.id)
+          .single();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
-      }
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          throw fetchError;
+        }
 
-      // if no profile exists yet
-      if (!data) {
+        if (!data) {
+          setLoading(false);
+          return;
+        }
+
+        setProfile(data);
+        setUsername(data.username || '');
+        setPhone(data.phone || '');
+
+        // Redirect only if BOTH username and phone exist
+        if (data.username && data.phone) {
+          setRedirected(true);
+          const destination = data.role === 'admin' ? '/admin' : '/supervisor';
+          navigate(destination, { replace: true });
+        }
+
+      } catch (err) {
+        console.error('Unexpected error fetching profile:', err);
+        setError('An unexpected error occurred');
+      } finally {
         setLoading(false);
-        return;
       }
+    };
 
-      setProfile(data);
-
-      // redirect only if BOTH username and phone are missing
-      if (!data.username || !data.phone) {
-        // stay here to complete profile
-        setLoading(false);
-        return;
-      }
-
-      // otherwise redirect to role-based page
-      setRedirected(true);
-      const destination = data.role === 'admin' ? '/admin' : '/supervisor';
-      navigate(destination, { replace: true });
-    } catch (err) {
-      console.error('Unexpected error fetching profile:', err);
-      setError('An unexpected error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchProfile();
-}, [user, navigate, redirected]);
+    fetchProfile();
+  }, [user, navigate, redirected]);
 
   // Submit profile update
   const handleProfileSubmit = async (e: React.FormEvent) => {
@@ -92,7 +89,7 @@ const HomePage: React.FC = () => {
             phone,
             role: 'supervisor', // default for new users
           },
-          { onConflict: 'id', returning: 'representation' }
+          { onConflict: 'id' } // remove 'returning'
         );
 
       if (upsertError) {
@@ -100,13 +97,19 @@ const HomePage: React.FC = () => {
         return;
       }
 
-      // Immediately update local profile state
-      const savedProfile = upsertedData?.[0];
-      setProfile(savedProfile);
+      // Update local profile state
+      const savedProfile = upsertedData?.[0] as Profile | undefined;
 
-      // Redirect based on role
-      const destination = savedProfile?.role === 'admin' ? '/admin' : '/supervisor';
-      navigate(destination, { replace: true });
+if (savedProfile) {
+  setProfile(savedProfile);
+
+  // TypeScript now knows savedProfile is Profile
+  const destination = savedProfile.role === 'admin' ? '/admin' : '/supervisor';
+  navigate(destination, { replace: true });
+} else {
+  setError('Failed to save profile.');
+}
+
     } catch (err) {
       console.error('Unexpected error on profile submit:', err);
       setError('An unexpected error occurred');
@@ -172,8 +175,14 @@ const HomePage: React.FC = () => {
     );
   }
 
-  // Fallback (should rarely appear)
-  return <p>Redirecting...</p>;
+  // Already complete profile → can show main page content here
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold text-gray-800">Welcome, {profile.username}</h1>
+      <p className="mt-2 text-gray-600">Your phone: {profile.phone}</p>
+      {/* Main dashboard content for users with complete profile */}
+    </div>
+  );
 };
 
 export default HomePage;

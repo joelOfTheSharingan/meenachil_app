@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase.ts";
-// Mock supabase - replace with your actual import: import { supabase } from "../lib/supabase.ts";
+
 // Types
 interface Site {
   site_name: string;
@@ -43,13 +43,13 @@ interface NavButton {
 }
 
 // Sidebar Component
-const Sidebar = ({ 
-  isOpen, 
-  onClose, 
-  navButtons 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
+const Sidebar = ({
+  isOpen,
+  onClose,
+  navButtons,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
   navButtons: NavButton[];
 }) => {
   const navigate = useNavigate();
@@ -62,15 +62,17 @@ const Sidebar = ({
   return (
     <>
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={onClose}
         />
       )}
 
-      <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-50 ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
+      <div
+        className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-50 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-800">Admin Menu</h2>
@@ -79,11 +81,16 @@ const Sidebar = ({
               className="text-gray-500 hover:text-gray-700 transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
-          
+
           <nav className="space-y-2">
             {navButtons.map((btn) => (
               <button
@@ -115,12 +122,12 @@ const EmptyState = () => (
 );
 
 // Request Card Component
-const RequestCard = ({ 
-  request, 
+const RequestCard = ({
+  request,
   onApprove,
-  onReject
-}: { 
-  request: RequestWithDetails; 
+  onReject,
+}: {
+  request: RequestWithDetails;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
 }) => {
@@ -129,7 +136,7 @@ const RequestCard = ({
       buy: "bg-blue-100 text-blue-800",
       sell: "bg-orange-100 text-orange-800",
       rent: "bg-green-100 text-green-800",
-      return: "bg-purple-100 text-purple-800"
+      return: "bg-purple-100 text-purple-800",
     };
     return colors[type] || "bg-gray-100 text-gray-800";
   };
@@ -153,10 +160,18 @@ const RequestCard = ({
         </h4>
 
         <div className="text-xs text-gray-600 space-y-1 mt-1">
-          <p><strong>Qty:</strong> {request.quantity}</p>
-          <p><strong>Site:</strong> {request.site_name || "Unknown"}</p>
-          <p><strong>From:</strong> {request.supervisor_username || "Unknown"}</p>
-          <p><strong>Date:</strong> {new Date(request.created_at).toLocaleDateString()}</p>
+          <p>
+            <strong>Qty:</strong> {request.quantity}
+          </p>
+          <p>
+            <strong>Site:</strong> {request.site_name || "Unknown"}
+          </p>
+          <p>
+            <strong>From:</strong> {request.supervisor_username || "Unknown"}
+          </p>
+          <p>
+            <strong>Date:</strong> {new Date(request.created_at).toLocaleDateString()}
+          </p>
         </div>
       </div>
 
@@ -179,11 +194,11 @@ const RequestCard = ({
 };
 
 // Quick Action Button Component
-const QuickActionButton = ({ 
-  button, 
-  onClick 
-}: { 
-  button: NavButton; 
+const QuickActionButton = ({
+  button,
+  onClick,
+}: {
+  button: NavButton;
   onClick: () => void;
 }) => (
   <button
@@ -201,72 +216,125 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<RequestWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>("all");
 
   // Navigation buttons configuration
   const navButtons: NavButton[] = [
-    { 
-      label: "See All Equipment", 
-      path: "/inventory", 
+    {
+      label: "See All Equipment",
+      path: "/inventory",
       color: "bg-blue-500 hover:bg-blue-600",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+          />
         </svg>
-      )
+      ),
     },
-    { 
-      label: "Manage Users", 
-      path: "/users", 
+    {
+      label: "Manage Users",
+      path: "/users",
       color: "bg-green-500 hover:bg-green-600",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+          />
         </svg>
-      )
+      ),
     },
-    { 
-      label: "Manage Sites", 
-      path: "/assign-sites", 
+    {
+      label: "Manage Sites",
+      path: "/assign-sites",
       color: "bg-yellow-500 hover:bg-yellow-600",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+          />
         </svg>
-      )
+      ),
     },
-    { 
-      label: "Transaction Logs", 
-      path: "/transactions", 
+    {
+      label: "Transaction Logs",
+      path: "/transactions",
       color: "bg-purple-500 hover:bg-purple-600",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
         </svg>
-      )
+      ),
     },
-    { 
-      label: "Equipment Requests", 
-      path: "/equipment-requests", 
+    {
+      label: "Equipment Requests",
+      path: "/equipment-requests",
       color: "bg-indigo-500 hover:bg-indigo-600",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+          />
         </svg>
-      )
+      ),
     },
   ];
 
-  // Fetch pending equipment requests with useCallback
+  // Fetch sites with pending requests
+  const fetchSitesWithPendingRequests = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("equipment_requests")
+        .select("site:site_id(site_name)")
+        .eq("status", "pending");
+
+      if (error) throw error;
+
+      // Extract unique site names
+      const uniqueSites = Array.from(
+        new Set(
+          data
+            ?.map((req: any) => req.site?.site_name)
+            .filter((site_name: string | undefined) => site_name)
+        )
+      ).map((site_name: string) => ({ site_name }));
+
+      setSites(uniqueSites);
+    } catch (err) {
+      console.error("Error fetching sites:", err);
+    }
+  }, []);
+
+  // Fetch pending equipment requests
   const fetchPendingRequests = useCallback(async () => {
     try {
       const { data, error } = await supabase
-  .from("equipment_requests")
-  .select(`
-    *,
-    site:site_id(site_name),
-    supervisor:supervisor_id(username),
-    equipment:equipment_id(name)
-  `)
+        .from("equipment_requests")
+        .select(`
+          *,
+          site:site_id(site_name),
+          supervisor:supervisor_id(username),
+          equipment:equipment_id(name)
+        `)
+        .eq("status", "pending");
 
       if (error) throw error;
 
@@ -286,8 +354,9 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
+    fetchSitesWithPendingRequests();
     fetchPendingRequests();
-  }, [fetchPendingRequests]);
+  }, [fetchSitesWithPendingRequests, fetchPendingRequests]);
 
   // Simplified logout handler
   const handleLogout = async () => {
@@ -306,11 +375,12 @@ export default function AdminDashboard() {
         .from("equipment_requests")
         .update({ status: "approved" })
         .eq("id", id);
-      
+
       if (error) throw error;
-      
-      // Refresh the list
+
+      // Refresh the list and sites
       fetchPendingRequests();
+      fetchSitesWithPendingRequests();
     } catch (err) {
       console.error("Error approving request:", err);
     }
@@ -322,11 +392,12 @@ export default function AdminDashboard() {
         .from("equipment_requests")
         .update({ status: "rejected" })
         .eq("id", id);
-      
+
       if (error) throw error;
-      
-      // Refresh the list
+
+      // Refresh the list and sites
       fetchPendingRequests();
+      fetchSitesWithPendingRequests();
     } catch (err) {
       console.error("Error rejecting request:", err);
     }
@@ -334,9 +405,9 @@ export default function AdminDashboard() {
 
   return (
     <div className="relative">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={() => setSidebarOpen(false)} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         navButtons={navButtons}
       />
 
@@ -345,12 +416,17 @@ export default function AdminDashboard() {
           {/* Header Section */}
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center space-x-4">
-              <button 
+              <button
                 className="text-gray-600 focus:outline-none hover:text-gray-800 transition-colors"
                 onClick={() => setSidebarOpen(true)}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
                 </svg>
               </button>
               <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
@@ -377,7 +453,19 @@ export default function AdminDashboard() {
           {/* Pending Equipment Requests */}
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Recent Equipment Requests</h3>
+              <select
+                className="border rounded p-2 text-sm"
+                value={selectedSite}
+                onChange={(e) => setSelectedSite(e.target.value)}
+              >
+                <option value="all">All Sites</option>
+                {sites.map((site) => (
+                  <option key={site.site_name} value={site.site_name}>
+                    {site.site_name}
+                  </option>
+                ))}
+              </select>
+
               <button
                 onClick={() => navigate("/equipment-requests")}
                 className="text-blue-600 hover:text-blue-800 text-sm font-medium"
@@ -385,21 +473,23 @@ export default function AdminDashboard() {
                 View All →
               </button>
             </div>
-            
+
             {loading ? (
               <LoadingSpinner />
             ) : pendingRequests.length === 0 ? (
               <EmptyState />
             ) : (
               <div className="space-y-3">
-                {pendingRequests.map((request) => (
-                  <RequestCard
-                    key={request.id}
-                    request={request}
-                    onApprove={handleApprove}
-                    onReject={handleReject}
-                  />
-                ))}
+                {pendingRequests
+                  .filter((req) => selectedSite === "all" || req.site_name === selectedSite)
+                  .map((request) => (
+                    <RequestCard
+                      key={request.id}
+                      request={request}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                    />
+                  ))}
               </div>
             )}
           </div>
@@ -408,8 +498,8 @@ export default function AdminDashboard() {
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-gray-800 mb-2">Admin Panel</h3>
             <p className="text-gray-600">
-              Use the buttons above or the menu sidebar to navigate to inventory management, 
-              user management, site assignment, or view transaction logs. The sidebar provides 
+              Use the buttons above or the menu sidebar to navigate to inventory management,
+              user management, site assignment, or view transaction logs. The sidebar provides
               quick access to all administrative functions.
             </p>
           </div>
