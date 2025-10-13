@@ -22,39 +22,49 @@ const HomePage: React.FC = () => {
 
   // Fetch user profile
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user || redirected) return;
+  const fetchProfile = async () => {
+    if (!user || redirected) return;
 
-      try {
-        const { data, error: fetchError } = await supabase
-          .from('users')
-          .select('username, phone, role')
-          .eq('id', user.id)
-          .single();
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('users')
+        .select('username, phone, role')
+        .eq('id', user.id)
+        .single();
 
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          throw fetchError;
-        }
-
-        if (data && data.username && data.phone) {
-          // Profile complete → redirect based on role
-          setRedirected(true);
-          const destination = data.role === 'admin' ? '/admin' : '/supervisor';
-          navigate(destination, { replace: true });
-        } else {
-          setUsername(data?.username || '');
-          setPhone(data?.phone || '');
-        }
-      } catch (err) {
-        console.error('Unexpected error fetching profile:', err);
-        setError('An unexpected error occurred');
-      } finally {
-        setLoading(false);
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
       }
-    };
 
-    fetchProfile();
-  }, [user, navigate, redirected]);
+      // if no profile exists yet
+      if (!data) {
+        setLoading(false);
+        return;
+      }
+
+      setProfile(data);
+
+      // redirect only if BOTH username and phone are missing
+      if (!data.username || !data.phone) {
+        // stay here to complete profile
+        setLoading(false);
+        return;
+      }
+
+      // otherwise redirect to role-based page
+      setRedirected(true);
+      const destination = data.role === 'admin' ? '/admin' : '/supervisor';
+      navigate(destination, { replace: true });
+    } catch (err) {
+      console.error('Unexpected error fetching profile:', err);
+      setError('An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchProfile();
+}, [user, navigate, redirected]);
 
   // Submit profile update
   const handleProfileSubmit = async (e: React.FormEvent) => {
