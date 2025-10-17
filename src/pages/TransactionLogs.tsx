@@ -19,7 +19,11 @@ interface TransactionLog {
 
 export default function TransactionLogs() {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
+  const [filteredLogs, setFilteredLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sites, setSites] = useState<string[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -45,7 +49,7 @@ export default function TransactionLogs() {
           status
         `);
 
-      // Filter for supervisors
+      // Supervisor filter
       if (user.role === "supervisor") {
         const { data: userSites, error: sitesError } = await supabase
           .from("construction_sites")
@@ -59,14 +63,13 @@ export default function TransactionLogs() {
         }
 
         if (userSites && userSites.length > 0) {
-          const siteIds = userSites.map((site) => site.id);
+          const siteIds = userSites.map((site) => `"${site.id}"`).join(",");
           query = query.or(
-            `from_site_id.in.(${siteIds.join(
-              ","
-            )}),to_site_id.in.(${siteIds.join(",")})`
+            `from_site_id.in.(${siteIds}),to_site_id.in.(${siteIds})`
           );
         } else {
           setLogs([]);
+          setFilteredLogs([]);
           setLoading(false);
           return;
         }
@@ -76,11 +79,13 @@ export default function TransactionLogs() {
 
       if (error) {
         console.error("Error fetching transaction logs:", error);
+        setLogs([]);
+        setFilteredLogs([]);
         setLoading(false);
         return;
       }
 
-      const transformed = (data || []).map((log: any) => ({
+      const transformed: TransactionLog[] = (data || []).map((log: any) => ({
         id: log.id,
         from_site_name: log.from_site?.site_name || "Unknown",
         to_site_name: log.to_site?.site_name || "Unknown",
@@ -94,7 +99,7 @@ export default function TransactionLogs() {
         status: log.status,
       }));
 
-      // Sort: pending first, then latest first (descending by requested_at)
+      // Sort: pending first, then latest first
       transformed.sort((a, b) => {
         if (a.status === "pending" && b.status !== "pending") return -1;
         if (a.status !== "pending" && b.status === "pending") return 1;
@@ -102,11 +107,35 @@ export default function TransactionLogs() {
       });
 
       setLogs(transformed);
+      setFilteredLogs(transformed);
+
+      // Extract unique site names
+      const uniqueSites = new Set<string>();
+      transformed.forEach((log) => {
+        if (log.from_site_name !== "Unknown") uniqueSites.add(log.from_site_name);
+        if (log.to_site_name !== "Unknown") uniqueSites.add(log.to_site_name);
+      });
+      setSites(Array.from(uniqueSites).sort());
+
       setLoading(false);
     };
 
     fetchLogs();
   }, [user]);
+
+  // Filter logs when site changes
+  useEffect(() => {
+    if (selectedSite === "all") {
+      setFilteredLogs(logs);
+    } else {
+      setFilteredLogs(
+        logs.filter(
+          (log) =>
+            log.from_site_name === selectedSite || log.to_site_name === selectedSite
+        )
+      );
+    }
+  }, [selectedSite, logs]);
 
   const getStatusClasses = (status: string) => {
     switch (status.toLowerCase()) {
@@ -141,10 +170,42 @@ export default function TransactionLogs() {
         </button>
       </div>
 
+      {/* Site Filter */}
+      <div className="mb-4 flex items-center space-x-3">
+        <label htmlFor="site-filter" className="font-semibold text-gray-700">
+          Filter by Site:
+        </label>
+        <select
+          id="site-filter"
+          value={selectedSite}
+          onChange={(e) => setSelectedSite(e.target.value)}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        >
+          <option value="all">All Sites</option>
+          {sites.map((site) => (
+            <option key={site} value={site}>
+              {site}
+            </option>
+          ))}
+        </select>
+        {selectedSite !== "all" && (
+          <button
+            onClick={() => setSelectedSite("all")}
+            className="text-sm text-blue-600 hover:text-blue-800 underline"
+          >
+            Clear Filter
+          </button>
+        )}
+      </div>
+
       {loading ? (
         <p className="text-gray-600">Loading...</p>
-      ) : logs.length === 0 ? (
-        <p className="text-gray-600">No transactions found.</p>
+      ) : filteredLogs.length === 0 ? (
+        <p className="text-gray-600">
+          {selectedSite === "all"
+            ? "No transactions found."
+            : `No transactions found for ${selectedSite}.`}
+        </p>
       ) : (
         <>
           {/* Desktop Table */}
@@ -165,7 +226,7 @@ export default function TransactionLogs() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
+                {filteredLogs.map((log) => (
                   <tr key={log.id} className="text-center">
                     <td className="px-4 py-2 border">{log.from_site_name}</td>
                     <td className="px-4 py-2 border">{log.to_site_name}</td>
@@ -197,7 +258,7 @@ export default function TransactionLogs() {
 
           {/* Mobile Cards */}
           <div className="space-y-4 md:hidden">
-            {logs.map((log) => (
+            {filteredLogs.map((log) => (
               <div
                 key={log.id}
                 className="bg-white border border-gray-200 rounded-lg shadow p-4"
