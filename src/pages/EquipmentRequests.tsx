@@ -17,12 +17,107 @@ interface RequestWithDetails extends EquipmentRequest {
   supervisor_username?: string;
 }
 
+// Edit Modal Component
+const EditModal: React.FC<{
+  request: RequestWithDetails;
+  onClose: () => void;
+  onSave: (updatedRequest: Partial<RequestWithDetails>) => void;
+}> = ({ request, onClose, onSave }) => {
+  const [editedRequest, setEditedRequest] = useState({
+    equipment_name: request.equipment_name || request.equipment_name_from_table || "",
+    quantity: request.quantity,
+    isRental: request.isRental,
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(editedRequest);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-800">Edit Request</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Equipment Name
+            </label>
+            <input
+              type="text"
+              value={editedRequest.equipment_name}
+              onChange={(e) => setEditedRequest({ ...editedRequest, equipment_name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Quantity
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={editedRequest.quantity}
+              onChange={(e) => setEditedRequest({ ...editedRequest, quantity: parseInt(e.target.value) })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="isRental"
+              checked={editedRequest.isRental}
+              onChange={(e) => setEditedRequest({ ...editedRequest, isRental: e.target.checked })}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="isRental" className="ml-2 text-sm text-gray-700">
+              Is Rental Equipment
+            </label>
+          </div>
+
+          <div className="flex space-x-3 pt-4">
+            <button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
+            >
+              Save Changes
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const EquipmentRequests: React.FC = () => {
   const navigate = useNavigate();
   const [requests, setRequests] = useState<RequestWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [editingRequest, setEditingRequest] = useState<RequestWithDetails | null>(null);
 
   // Fetch all equipment requests with related data
   const fetchRequests = async () => {
@@ -68,6 +163,31 @@ const EquipmentRequests: React.FC = () => {
       navigate("/login");
     } catch (error: any) {
       console.error("Error logging out:", error.message);
+    }
+  };
+
+  const handleEditSave = async (requestId: string, updates: Partial<RequestWithDetails>) => {
+    try {
+      const { error } = await supabase
+        .from("equipment_requests")
+        .update({
+          equipment_name: updates.equipment_name,
+          quantity: updates.quantity,
+          isRental: updates.isRental,
+        })
+        .eq("id", requestId);
+
+      if (error) {
+        alert("Error updating request: " + error.message);
+        return;
+      }
+
+      alert("✅ Request updated successfully");
+      setEditingRequest(null);
+      fetchRequests();
+    } catch (err: any) {
+      alert("Error updating request: " + err.message);
+      console.error(err);
     }
   };
 
@@ -244,6 +364,15 @@ const EquipmentRequests: React.FC = () => {
 
   return (
     <div className="relative">
+      {/* Edit Modal */}
+      {editingRequest && (
+        <EditModal
+          request={editingRequest}
+          onClose={() => setEditingRequest(null)}
+          onSave={(updates) => handleEditSave(editingRequest.id, updates)}
+        />
+      )}
+
       {/* Sidebar Overlay */}
       {sidebarOpen && (
         <div 
@@ -417,28 +546,38 @@ const EquipmentRequests: React.FC = () => {
                         <p><strong>Quantity:</strong> {request.quantity}</p>
                         <p><strong>Site:</strong> {request.site_name || "Unknown Site"}</p>
                         <p><strong>Supervisor:</strong> {request.supervisor_username || request.supervisor_email || "Unknown"}</p>
-
                         <p><strong>Requested:</strong> {new Date(request.created_at).toLocaleString()}</p>
                       </div>
                     </div>
 
-                    {request.status === "pending" && (
-                      <div className="flex flex-col space-y-2 ml-4">
-                        <button
-                          onClick={() => handleApprove(request)}
-                          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleReject(request)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-
+                    <div className="flex flex-col space-y-2 ml-4">
+                      {request.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => setEditingRequest(request)}
+                            className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center justify-center space-x-1"
+                            title="Edit Request"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleApprove(request)}
+                            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReject(request)}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
