@@ -121,15 +121,13 @@ const EmptyState = () => (
   <p className="text-gray-500 text-center py-4">No pending requests</p>
 );
 
-// Request Card Component
+// Request Card Component - Now clickable to navigate
 const RequestCard = ({
   request,
-  onApprove,
-  onReject,
+  onClick,
 }: {
   request: RequestWithDetails;
-  onApprove: (id: string) => void;
-  onReject: (id: string) => void;
+  onClick: () => void;
 }) => {
   const getTypeColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -142,52 +140,48 @@ const RequestCard = ({
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow flex justify-between items-center">
-      <div className="flex-1">
-        <div className="flex items-center space-x-2 mb-2">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(request.type)}`}>
-            {request.type.toUpperCase()}
-          </span>
-          {request.isRental && (
-            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              RENTAL
+    <div 
+      onClick={onClick}
+      className="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer"
+    >
+      <div className="flex justify-between items-center">
+        <div className="flex-1">
+          <div className="flex items-center space-x-2 mb-2">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(request.type)}`}>
+              {request.type.toUpperCase()}
             </span>
-          )}
+            {request.isRental && (
+              <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                RENTAL
+              </span>
+            )}
+          </div>
+
+          <h4 className="font-medium text-gray-800 text-sm">
+            {request.equipment_name || request.equipment_name_from_table || "Unknown Equipment"}
+          </h4>
+
+          <div className="text-xs text-gray-600 space-y-1 mt-1">
+            <p>
+              <strong>Qty:</strong> {request.quantity}
+            </p>
+            <p>
+              <strong>Site:</strong> {request.site_name || "Unknown"}
+            </p>
+            <p>
+              <strong>From:</strong> {request.supervisor_username || "Unknown"}
+            </p>
+            <p>
+              <strong>Date:</strong> {new Date(request.created_at).toLocaleDateString()}
+            </p>
+          </div>
         </div>
 
-        <h4 className="font-medium text-gray-800 text-sm">
-          {request.equipment_name || request.equipment_name_from_table || "Unknown Equipment"}
-        </h4>
-
-        <div className="text-xs text-gray-600 space-y-1 mt-1">
-          <p>
-            <strong>Qty:</strong> {request.quantity}
-          </p>
-          <p>
-            <strong>Site:</strong> {request.site_name || "Unknown"}
-          </p>
-          <p>
-            <strong>From:</strong> {request.supervisor_username || "Unknown"}
-          </p>
-          <p>
-            <strong>Date:</strong> {new Date(request.created_at).toLocaleDateString()}
-          </p>
+        <div className="ml-4 text-blue-600">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+          </svg>
         </div>
-      </div>
-
-      <div className="flex flex-col space-y-2 ml-4">
-        <button
-          onClick={() => onApprove(request.id)}
-          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
-        >
-          Approve
-        </button>
-        <button
-          onClick={() => onReject(request.id)}
-          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
-        >
-          Reject
-        </button>
       </div>
     </div>
   );
@@ -368,39 +362,9 @@ export default function AdminDashboard() {
     }
   };
 
-  // Handle inline approve/reject actions
-  const handleApprove = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("equipment_requests")
-        .update({ status: "approved" })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      // Refresh the list and sites
-      fetchPendingRequests();
-      fetchSitesWithPendingRequests();
-    } catch (err) {
-      console.error("Error approving request:", err);
-    }
-  };
-
-  const handleReject = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("equipment_requests")
-        .update({ status: "rejected" })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      // Refresh the list and sites
-      fetchPendingRequests();
-      fetchSitesWithPendingRequests();
-    } catch (err) {
-      console.error("Error rejecting request:", err);
-    }
+  // Handle card click - navigate to equipment requests page
+  const handleRequestClick = () => {
+    navigate("/equipment-requests");
   };
 
   return (
@@ -453,8 +417,21 @@ export default function AdminDashboard() {
           {/* Pending Equipment Requests */}
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Pending Requests</h2>
+              <button
+                onClick={() => navigate("/equipment-requests")}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center space-x-1"
+              >
+                <span>View All</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-4">
               <select
-                className="border rounded p-2 text-sm"
+                className="border rounded p-2 text-sm w-full md:w-auto"
                 value={selectedSite}
                 onChange={(e) => setSelectedSite(e.target.value)}
               >
@@ -465,13 +442,6 @@ export default function AdminDashboard() {
                   </option>
                 ))}
               </select>
-
-              <button
-                onClick={() => navigate("/equipment-requests")}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              >
-                View All →
-              </button>
             </div>
 
             {loading ? (
@@ -482,14 +452,24 @@ export default function AdminDashboard() {
               <div className="space-y-3">
                 {pendingRequests
                   .filter((req) => selectedSite === "all" || req.site_name === selectedSite)
+                  .slice(0, 5)
                   .map((request) => (
                     <RequestCard
                       key={request.id}
                       request={request}
-                      onApprove={handleApprove}
-                      onReject={handleReject}
+                      onClick={handleRequestClick}
                     />
                   ))}
+                {pendingRequests.filter((req) => selectedSite === "all" || req.site_name === selectedSite).length > 5 && (
+                  <div className="text-center pt-2">
+                    <button
+                      onClick={() => navigate("/equipment-requests")}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      View {pendingRequests.filter((req) => selectedSite === "all" || req.site_name === selectedSite).length - 5} more requests →
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -499,8 +479,8 @@ export default function AdminDashboard() {
             <h3 className="text-lg font-semibold text-gray-800 mb-2">Admin Panel</h3>
             <p className="text-gray-600">
               Use the buttons above or the menu sidebar to navigate to inventory management,
-              user management, site assignment, or view transaction logs. The sidebar provides
-              quick access to all administrative functions.
+              user management, site assignment, or view transaction logs. Click on any pending 
+              request to view details and take action in the Equipment Requests page.
             </p>
           </div>
         </div>
