@@ -60,7 +60,8 @@ export type EquipmentTransfer = {
   quantity: number; // number being moved
   status: "pending" | "approved" | "rejected";
   comment?: string; // optional comment
-  vehicle_number?: string; // NEW: max 13 chars
+  vehicle_number?: string; // max 13 chars
+  remarks?: string; // ✅ newly added column (text)
   created_at: string;
 };
 

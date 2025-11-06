@@ -27,6 +27,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [expandedRemarks, setExpandedRemarks] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
   // Refresh incoming requests (to selected site)
@@ -42,6 +43,7 @@ const Dashboard: React.FC = () => {
           accepted,
           comment,
           vehicle_number,
+          remarks,
           equipment(name, isRental),
           from_site_id,
           to_site_id,
@@ -76,6 +78,7 @@ const Dashboard: React.FC = () => {
           accepted,
           comment,
           vehicle_number,
+          remarks,
           equipment(name, isRental),
           from_site_id,
           to_site_id,
@@ -405,6 +408,18 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const toggleRemark = (reqId: string) => {
+    setExpandedRemarks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(reqId)) {
+        newSet.delete(reqId);
+      } else {
+        newSet.add(reqId);
+      }
+      return newSet;
+    });
+  };
+
   if (loading) return <Loader />;
 
   const pendingRequests = incomingRequests.filter(
@@ -633,9 +648,24 @@ const Dashboard: React.FC = () => {
                       <span className="text-sm text-gray-500">Status: {req.status}</span>
                       {req.vehicle_number && (
                           <span className="text-sm text-gray-500">
-                            Vehicle:{req.vehicle_number}
+                            Vehicle: {req.vehicle_number}
                           </span>
                         )}
+                      {req.remarks && (
+                        <div className="mt-2">
+                          <button
+                            onClick={() => toggleRemark(req.id)}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                          >
+                            {expandedRemarks.has(req.id) ? '▼' : '▶'} View Remark
+                          </button>
+                          {expandedRemarks.has(req.id) && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                              <p className="text-sm text-gray-700">{req.remarks}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <span className="text-xs text-gray-400">
                         Requested: {new Date(req.requested_at).toLocaleString()}
                       </span>
@@ -698,6 +728,21 @@ const Dashboard: React.FC = () => {
 </span>
 
                         )}
+                      {req.remarks && (
+                        <div className="mt-2">
+                          <button
+                            onClick={() => toggleRemark(req.id)}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                          >
+                            {expandedRemarks.has(req.id) ? '▼' : '▶'} View Remark
+                          </button>
+                          {expandedRemarks.has(req.id) && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                              <p className="text-sm text-gray-700">{req.remarks}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <span className="text-xs text-gray-400">
                         Requested: {new Date(req.requested_at).toLocaleString()}
                       </span>

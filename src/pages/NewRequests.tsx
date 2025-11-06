@@ -24,6 +24,7 @@ const NewRequests: React.FC = () => {
   const [quantity, setQuantity] = useState<number>(1);
   const [maxQuantity, setMaxQuantity] = useState<number>(1);
   const [vehicleNumber, setVehicleNumber] = useState<string>("");
+  const [remarks, setRemarks] = useState<string>(""); // ✅ new state for remarks
   const [loading, setLoading] = useState<boolean>(false);
 
   // Fetch supervisor's sites
@@ -63,7 +64,7 @@ const NewRequests: React.FC = () => {
     fetchSites();
   }, []);
 
-  // Fetch equipment and sum non-rental and rental separately
+  // Fetch equipment
   useEffect(() => {
     if (!fromSiteId) return;
 
@@ -133,7 +134,7 @@ const NewRequests: React.FC = () => {
       quantity <= 0 ||
       vehicleNumber.length > 13
     ) {
-      alert("Please fill all fields correctly. Vehicle number must be <= 13 characters.");
+      alert("Please fill all fields correctly. Vehicle number must be ≤ 13 characters.");
       return;
     }
 
@@ -146,7 +147,8 @@ const NewRequests: React.FC = () => {
         requested_by: user.id,
         status: "pending",
         quantity,
-        vehicle_number: vehicleNumber, // added here
+        vehicle_number: vehicleNumber,
+        remarks, // ✅ send remark to Supabase
       },
     ]);
     setLoading(false);
@@ -279,6 +281,18 @@ const NewRequests: React.FC = () => {
               </option>
             ))}
           </select>
+        </div>
+
+        {/* ✅ Remarks */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Remarks</label>
+          <textarea
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            placeholder="Enter remarks (optional)"
+            className="w-full border rounded-lg p-2"
+            rows={3}
+          />
         </div>
 
         <button
