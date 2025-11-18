@@ -1,33 +1,47 @@
 import { createClient } from "@supabase/supabase-js";
 
-// ✅ Replace with your actual Supabase values
+// Supabase credentials
 const supabaseUrl = "https://eycuakkufbolyyawlpno.supabase.co";
 const supabaseAnonKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5Y3Vha2t1ZmJvbHl5YXdscG5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyMjkyODMsImV4cCI6MjA2OTgwNTI4M30.cfZgo625Au9Ss0dSJYMuEMWUvuzD-4mOBD1dvnfp_tI";
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("❌ Missing Supabase environment variables. Check .env file.");
-}
+export const STORAGE_BUCKET = "Transfer-Images";
 
-// 🔑 Initialize Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
- * Matches the `users` table in your database
+ * Upload an image to Supabase Storage
  */
+export async function uploadImageToSupabase(file: File) {
+  const ext = file.name.split(".").pop();
+  const fileName = `${crypto.randomUUID()}.${ext}`;
+  const filePath = `transfers/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(filePath, file);
+
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
+
+/** Type definitions */
+
 export type User = {
-  id: string; // UUID from auth.users (primary key)
+  id: string;
   email: string;
   role: "admin" | "supervisor";
   name?: string;
   phone?: string;
   company_passkey?: string;
-  site_id?: string | null; // link to site, can be null
+  site_id?: string | null;
 };
 
-/**
- * Matches the `construction_sites` table
- */
 export type ConstructionSite = {
   id: string;
   site_name: string;
@@ -35,46 +49,38 @@ export type ConstructionSite = {
   supervisor_id: string;
 };
 
-/**
- * Matches the `equipment` table
- */
 export type Equipment = {
-  id: number; // Postgres int8
+  id: number;
   name: string;
   status: "available" | "in use" | "transferring";
   site_id: string;
   isRental: boolean;
-  quantity: number; // ✅ Track quantity directly
+  quantity: number;
 };
 
-/**
- * Matches the `equipment_transfers` table
- */
 export type EquipmentTransfer = {
-  id: number; // Postgres int8
-  equipment_id: number; // int8
+  id: number;
+  equipment_id: number;
   from_site_id: string;
   to_site_id: string;
-  requested_by: string; // user id
-  approved_by?: string; // user id
-  quantity: number; // number being moved
+  requested_by: string;
+  approved_by?: string;
+  quantity: number;
   status: "pending" | "approved" | "rejected";
-  comment?: string; // optional comment
-  vehicle_number?: string; // max 13 chars
-  remarks?: string; // ✅ newly added column (text)
+  comment?: string;
+  vehicle_number?: string;
+  remarks?: string;
   created_at: string;
+  image_url?: string;
 };
 
-/**
- * Matches the `equipment_requests` table
- */
 export type EquipmentRequest = {
-  id: string; // UUID
-  site_id: string; // UUID -> construction_sites.id
-  supervisor_id: string; // UUID -> users.id
+  id: string;
+  site_id: string;
+  supervisor_id: string;
   type: "buy" | "sell" | "return" | "rent";
-  equipment_name?: string; // if supervisor types custom name
-  equipment_id?: number; // nullable -> equipment.id
+  equipment_name?: string;
+  equipment_id?: number;
   quantity: number;
   isRental: boolean;
   status: "pending" | "approved" | "rejected";

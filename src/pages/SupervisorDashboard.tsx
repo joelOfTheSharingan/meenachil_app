@@ -28,6 +28,7 @@ const Dashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [expandedRemarks, setExpandedRemarks] = useState<Set<string>>(new Set());
+  const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
   // Refresh incoming requests (to selected site)
@@ -44,6 +45,7 @@ const Dashboard: React.FC = () => {
           comment,
           vehicle_number,
           remarks,
+          image_url,
           equipment(name, isRental),
           from_site_id,
           to_site_id,
@@ -419,6 +421,17 @@ const Dashboard: React.FC = () => {
       return newSet;
     });
   };
+  const toggleImage = (reqId: string) => {
+    setExpandedImages(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(reqId)) {
+        newSet.delete(reqId);
+      } else {
+        newSet.add(reqId);
+      }
+      return newSet;
+    });
+  };
 
   if (loading) return <Loader />;
 
@@ -632,13 +645,14 @@ const Dashboard: React.FC = () => {
                         <span className="font-medium text-gray-700">
                           {req.equipment?.name || "Unknown Equipment"}
                         </span>
-                        
+
                         {req.equipment?.isRental && (
                           <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
                             Rental
                           </span>
                         )}
                       </div>
+
                       <span className="text-sm text-gray-500">
                         Quantity: {req.quantity ?? "N/A"}
                       </span>
@@ -646,19 +660,43 @@ const Dashboard: React.FC = () => {
                         From: {req.from_site?.site_name || "Unknown Site"}
                       </span>
                       <span className="text-sm text-gray-500">Status: {req.status}</span>
+
                       {req.vehicle_number && (
-                          <span className="text-sm text-gray-500">
-                            Vehicle: {req.vehicle_number}
-                          </span>
-                        )}
+                        <span className="text-sm text-gray-500">Vehicle: {req.vehicle_number}</span>
+                      )}
+
+                      {/* SEE IMAGE BUTTON */}
+                      {req.image_url && (
+                        <div className="mt-2">
+                          <button
+                            onClick={() => toggleImage(req.id)}
+                            className="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center gap-1"
+                          >
+                            {expandedImages.has(req.id) ? "▼ Hide Image" : "▶ See Image"}
+                          </button>
+
+                          {expandedImages.has(req.id) && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                              <img
+                                src={req.image_url}
+                                alt="Attached"
+                                className="max-h-64 rounded shadow-md object-contain mx-auto"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* REMARKS */}
                       {req.remarks && (
                         <div className="mt-2">
                           <button
                             onClick={() => toggleRemark(req.id)}
                             className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
                           >
-                            {expandedRemarks.has(req.id) ? '▼' : '▶'} View Remark
+                            {expandedRemarks.has(req.id) ? "▼" : "▶"} View Remark
                           </button>
+
                           {expandedRemarks.has(req.id) && (
                             <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
                               <p className="text-sm text-gray-700">{req.remarks}</p>
@@ -666,10 +704,12 @@ const Dashboard: React.FC = () => {
                           )}
                         </div>
                       )}
+
                       <span className="text-xs text-gray-400">
                         Requested: {new Date(req.requested_at).toLocaleString()}
                       </span>
 
+                      {/* ACCEPT / REJECT */}
                       <div className="mt-2 flex space-x-2">
                         <button
                           className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
@@ -680,9 +720,7 @@ const Dashboard: React.FC = () => {
                         <button
                           className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
                           onClick={() => {
-                            if (
-                              window.confirm("Are you sure you want to reject this request?")
-                            ) {
+                            if (window.confirm("Are you sure you want to reject this request?")) {
                               handleDecision(req, false);
                             }
                           }}
@@ -695,6 +733,7 @@ const Dashboard: React.FC = () => {
                 )}
               </div>
             </div>
+
 
             {/* Outgoing Requests */}
             <div className="mb-6">
