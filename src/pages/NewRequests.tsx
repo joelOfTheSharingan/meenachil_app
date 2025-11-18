@@ -163,7 +163,10 @@ if (imageFile) {
 
     if (error) {
       console.error(error);
-      alert("Failed to create request.");
+      alert("Failed to create request. Try refreshing");
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } else {
       alert("Transfer submitted successfully.");
       navigate("/dashboard");

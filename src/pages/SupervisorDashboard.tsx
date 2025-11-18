@@ -29,6 +29,7 @@ const Dashboard: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [expandedRemarks, setExpandedRemarks] = useState<Set<string>>(new Set());
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set());
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Refresh incoming requests (to selected site)
@@ -81,6 +82,7 @@ const Dashboard: React.FC = () => {
           comment,
           vehicle_number,
           remarks,
+          image_url,
           equipment(name, isRental),
           from_site_id,
           to_site_id,
@@ -282,86 +284,129 @@ const Dashboard: React.FC = () => {
   };
 
   const handleDecision = async (req: EquipmentTransfer, accept: boolean) => {
-    if (!req.equipment_id || !req.to_site_id || !req.from_site_id) {
-      alert("Missing equipment or site info.");
-      console.error("Request missing IDs:", req);
-      return;
-    }
+  if (!req.equipment_id || !req.to_site_id || !req.from_site_id) {
+    alert("Missing equipment or site info.");
+    console.error("Request missing IDs:", req);
+    return;
+  }
 
-    const comment = window.prompt(
-      `Add a comment for ${accept ? "accepting" : "rejecting"} this request:`,
-      req.comment || ""
-    );
-    if (comment === null) return;
+  const comment = window.prompt(
+    `Add a comment for ${accept ? "accepting" : "rejecting"} this request:`,
+    req.comment || ""
+  );
+  if (comment === null) return;
 
-    try {
-      const { error: transferError } = await supabase
-        .from("equipment_transfers")
-        .update({
-          status: accept ? "approved" : "rejected",
-          accepted: accept ? true : false,
-          comment,
-        })
-        .eq("id", req.id);
-      if (transferError) throw transferError;
+  try {
+    // Update the transfer status first
+    const { error: transferError } = await supabase
+      .from("equipment_transfers")
+      .update({
+        status: accept ? "approved" : "rejected",
+        accepted: accept ? true : false,
+        comment,
+      })
+      .eq("id", req.id);
+    
+    if (transferError) throw transferError;
 
-      if (!accept) {
-        if (selectedSiteId) {
-          await refreshRequests(selectedSiteId);
-          await refreshOutgoingRequests(selectedSiteId);
-        }
-        return;
-      }
-
-      const { data: fromEquipments, error: fromError } = await supabase
-        .from("equipment")
-        .select("*")
-        .eq("id", req.equipment_id);
-
-      if (fromError || !fromEquipments || fromEquipments.length === 0) {
-        alert("Error: Source equipment not found.");
-        console.error("Source equipment fetch error:", fromError);
-        return;
-      }
-
-      const fromEq = fromEquipments[0];
-
-      const { error: insertError } = await supabase.from("equipment").insert([
-        {
-          name: fromEq.name,
-          status: fromEq.status,
-          isRental: fromEq.isRental,
-          quantity: -req.quantity,
-          site_id: req.from_site_id,
-          date_bought: new Date().toISOString(),
-        },
-        {
-          name: fromEq.name,
-          status: fromEq.status,
-          isRental: fromEq.isRental,
-          quantity: req.quantity,
-          site_id: req.to_site_id,
-          date_bought: new Date().toISOString(),
-        },
-      ]);
-
-      if (insertError) {
-        alert("Error recording transfer in equipment table.");
-        console.error(insertError);
-        return;
-      }
-
+    // If rejected, just refresh and return
+    if (!accept) {
       if (selectedSiteId) {
         await refreshRequests(selectedSiteId);
         await refreshOutgoingRequests(selectedSiteId);
-        await refreshEquipment(selectedSiteId);
       }
-    } catch (err: any) {
-      alert("Error processing transfer: " + err.message);
-      console.error(err);
+      return;
     }
-  };
 
+    // ✅ FIXED: Proper equipment transfer logic for ACCEPTED requests
+    
+    // 1. Get the source equipment details
+    const { data: fromEquipment, error: fromError } = await supabase
+      .from("equipment")
+      .select("*")
+      .eq("id", req.equipment_id)
+      .single();
+
+    if (fromError || !fromEquipment) {
+      alert("Error: Source equipment not found.");
+      console.error("Source equipment fetch error:", fromError);
+      return;
+    }
+
+    // 2. Update source site equipment (reduce quantity)
+    const { error: updateSourceError } = await supabase
+      .from("equipment")
+      .update({ 
+        quantity: fromEquipment.quantity - req.quantity 
+      })
+      .eq("id", req.equipment_id);
+
+    if (updateSourceError) {
+      alert("Error updating source equipment quantity.");
+      console.error("Update source error:", updateSourceError);
+      return;
+    }
+
+    // 3. Find existing equipment at destination site with same name
+    const { data: existingDestEquipment, error: destQueryError } = await supabase
+      .from("equipment")
+      .select("*")
+      .eq("site_id", req.to_site_id)
+      .eq("name", fromEquipment.name)
+      .maybeSingle();
+
+    if (destQueryError) {
+      console.error("Error querying destination equipment:", destQueryError);
+    }
+
+    if (existingDestEquipment) {
+      // 4a. Update existing equipment at destination
+      const { error: updateDestError } = await supabase
+        .from("equipment")
+        .update({ 
+          quantity: existingDestEquipment.quantity + req.quantity 
+        })
+        .eq("id", existingDestEquipment.id);
+
+      if (updateDestError) {
+        alert("Error updating destination equipment quantity.");
+        console.error("Update destination error:", updateDestError);
+        return;
+      }
+    } else {
+      // 4b. Create new equipment record at destination
+      const { error: insertDestError } = await supabase
+        .from("equipment")
+        .insert({
+          name: fromEquipment.name,
+          status: fromEquipment.status,
+          isRental: fromEquipment.isRental,
+          quantity: req.quantity,
+          site_id: req.to_site_id,
+          date_bought: fromEquipment.date_bought || new Date().toISOString(),
+        });
+
+      if (insertDestError) {
+        alert("Error creating equipment at destination site.");
+        console.error("Insert destination error:", insertDestError);
+        return;
+      }
+    }
+
+    // Refresh all data
+    if (selectedSiteId) {
+      await refreshRequests(selectedSiteId);
+      await refreshOutgoingRequests(selectedSiteId);
+      await refreshEquipment(selectedSiteId);
+    }
+
+    alert(`Transfer ${accept ? "approved" : "rejected"} successfully!`);
+
+  } catch (err: any) {
+    alert("Error processing transfer: " + err.message);
+    console.error(err);
+  }
+};
   const handleCancelTransfer = async (req: EquipmentTransfer) => {
     try {
       const { error: cancelError } = await supabase
@@ -680,8 +725,10 @@ const Dashboard: React.FC = () => {
                               <img
                                 src={req.image_url}
                                 alt="Attached"
-                                className="max-h-64 rounded shadow-md object-contain mx-auto"
+                                className="max-h-64 rounded shadow-md object-contain mx-auto cursor-pointer"
+                                onClick={() => setFullScreenImage(req.image_url)}
                               />
+
                             </div>
                           )}
                         </div>
@@ -734,112 +781,175 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-
             {/* Outgoing Requests */}
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-blue-700 mb-4">Outgoing Requests</h2>
-              <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
-                {outgoingRequests.length === 0 && outgoingAdminRequests.length === 0 ? (
-                  <p className="text-gray-500">No outgoing requests.</p>
-                ) : (
-                  <>
-                  {outgoingRequests.map((req) => (
-                    <div key={req.id} className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-gray-700">
-                          {req.equipment?.name || "Unknown Equipment"}
-                        </span>
-                        
-                        {req.equipment?.isRental && (
-                          <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                            Rental
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-sm text-gray-500">Quantity: {req.quantity ?? "N/A"}</span>
-                      <span className="text-sm text-gray-500">
-                        To: {req.to_site?.site_name || "Unknown Site"}
-                      </span>
-                      <span className="text-sm text-gray-500">Status: {req.status}</span>
-                      {req.vehicle_number && (
-                          <span className="text-sm text-gray-500 whitespace-nowrap overflow-x-auto">
-  Vehicle: {req.vehicle_number}
-</span>
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-blue-700 mb-4">Outgoing Requests</h2>
+                <div className="bg-gray-100 p-4 rounded-lg shadow-inner">
+                  {outgoingRequests.length === 0 && outgoingAdminRequests.length === 0 ? (
+                    <p className="text-gray-500">No outgoing requests.</p>
+                  ) : (
+                    <>
+                      {outgoingRequests.map((req) => (
+                        <div key={req.id} className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-medium text-gray-700">
+                              {req.equipment?.name || "Unknown Equipment"}
+                            </span>
+                            {req.equipment?.isRental && (
+                              <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                                Rental
+                              </span>
+                            )}
+                          </div>
 
-                        )}
-                      {req.remarks && (
+                          <span className="text-sm text-gray-500">Quantity: {req.quantity ?? "N/A"}</span>
+                          <span className="text-sm text-gray-500">
+                            To: {req.to_site?.site_name || "Unknown Site"}
+                          </span>
+                          <span className="text-sm text-gray-500">Status: {req.status}</span>
+                          {req.vehicle_number && (
+                            <span className="text-sm text-gray-500 whitespace-nowrap overflow-x-auto">
+                              Vehicle: {req.vehicle_number}
+                            </span>
+                          )}
+
+                          {/* IMAGE BUTTON */}
+                          {req.image_url && (
                         <div className="mt-2">
                           <button
-                            onClick={() => toggleRemark(req.id)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                            onClick={() => toggleImage(req.id)}
+                            className="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center gap-1"
                           >
-                            {expandedRemarks.has(req.id) ? '▼' : '▶'} View Remark
+                            {expandedImages.has(req.id) ? "▼ Hide Image" : "▶ See Image"}
                           </button>
-                          {expandedRemarks.has(req.id) && (
+
+                          {expandedImages.has(req.id) && (
                             <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-                              <p className="text-sm text-gray-700">{req.remarks}</p>
+                              <img
+                                src={req.image_url}
+                                alt="Attached"
+                                className="max-h-64 rounded shadow-md object-contain mx-auto cursor-pointer"
+                                onClick={() => setFullScreenImage(req.image_url)}
+                              />
+
                             </div>
                           )}
                         </div>
                       )}
-                      <span className="text-xs text-gray-400">
-                        Requested: {new Date(req.requested_at).toLocaleString()}
-                      </span>
 
-                      {req.status === "pending" && (
-                        <div className="mt-2">
-                          <button
-                            className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
-                            onClick={() => {
-                              if (window.confirm("Are you sure you want to cancel this transfer?")) {
-                                handleCancelTransfer(req);
-                              }
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                          {req.remarks && (
+                            <div className="mt-2">
+                              <button
+                                onClick={() => toggleRemark(req.id)}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                              >
+                                {expandedRemarks.has(req.id) ? '▼' : '▶'} View Remark
+                              </button>
+                              {expandedRemarks.has(req.id) && (
+                                <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                                  <p className="text-sm text-gray-700">{req.remarks}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
-                  {/* Outgoing requests to Admin */}
-                  {outgoingAdminRequests.map((req: any) => (
-                    <div key={req.id} className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-gray-700">
-                          {req.equipment?.name || "Unknown Equipment"}
-                        </span>
-                        {req.equipment?.isRental && (
-                          <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                            Rental
+                          <span className="text-xs text-gray-400">
+                            Requested: {new Date(req.requested_at).toLocaleString()}
                           </span>
-                        )}
-                      </div>
-                      <span className="text-sm text-gray-500">Quantity: {req.quantity ?? "N/A"}</span>
-                      <span className="text-sm text-gray-500">To: Admin</span>
-                      <span className="text-sm text-gray-500">Status: {req.status}</span>
-                      
-                      <span className="text-xs text-gray-400">
-                        Requested: {new Date(req.requested_at).toLocaleString()}
-                      </span>
 
-                      {req.status === "pending" && (
-                        <div className="mt-2">
-                          <button
-                            className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
-                            onClick={() => handleCancelAdminRequest(req.id)}
-                          >
-                            Cancel
-                          </button>
+                          {req.status === "pending" && (
+                            <div className="mt-2">
+                              <button
+                                className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+                                onClick={() => {
+                                  if (window.confirm("Are you sure you want to cancel this transfer?")) {
+                                    handleCancelTransfer(req);
+                                  }
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
-                  </>
+                      ))}
+
+                      {/* Outgoing requests to Admin */}
+                      {outgoingAdminRequests.map((req: any) => (
+                        <div key={req.id} className="flex flex-col bg-white p-3 mb-2 rounded-md shadow-sm">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-medium text-gray-700">
+                              {req.equipment?.name || "Unknown Equipment"}
+                            </span>
+                            {req.equipment?.isRental && (
+                              <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                                Rental
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="text-sm text-gray-500">Quantity: {req.quantity ?? "N/A"}</span>
+                          <span className="text-sm text-gray-500">To: Admin</span>
+                          <span className="text-sm text-gray-500">Status: {req.status}</span>
+
+                          {/* IMAGE BUTTON */}
+                          {req.image_url && (
+                            <div className="mt-2">
+                              <button
+                                onClick={() => toggleImage(req.id)}
+                                className="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center gap-1"
+                              >
+                                {expandedImages.has(req.id) ? "▼ Hide Image" : "▶ See Image"}
+                              </button>
+
+                              {expandedImages.has(req.id) && (
+                                <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                                  <img
+                                    src={req.image_url}
+                                    alt="Attached"
+                                    className="max-h-64 rounded shadow-md object-contain mx-auto cursor-pointer"
+                                    onClick={() => setFullScreenImage(req.image_url)}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <span className="text-xs text-gray-400">
+                            Requested: {new Date(req.requested_at).toLocaleString()}
+                          </span>
+
+                          {req.status === "pending" && (
+                            <div className="mt-2">
+                              <button
+                                className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+                                onClick={() => handleCancelAdminRequest(req.id)}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                {/* FULLSCREEN IMAGE MODAL */}
+                {fullScreenImage && (
+                  <div
+                    className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
+                    onClick={() => setFullScreenImage(null)}
+                  >
+                    <img
+                      src={fullScreenImage}
+                      alt="Full screen"
+                      className="max-h-full max-w-full object-contain rounded shadow-lg"
+                    />
+                  </div>
                 )}
               </div>
-            </div>
+
           </>
         ) : (
           <div className="text-center py-8">
