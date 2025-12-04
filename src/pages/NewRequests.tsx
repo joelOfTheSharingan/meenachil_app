@@ -3,11 +3,26 @@ import { supabase, uploadImageToSupabase } from "../lib/supabase.ts";
 import { useAuth } from "../contexts/AuthContext.tsx";
 import { useNavigate } from "react-router-dom";
 
+// Simple Icon components to avoid external dependencies like lucide-react for this snippet
+const PlusIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+);
+const TrashIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+);
+
 interface EquipmentItem {
   id: number;
   name: string;
   total: number;
   type: "nonRental" | "rental";
+}
+
+interface TransferRow {
+  localId: number; // For React keys
+  equipmentId: string;
+  quantity: number;
+  maxQuantity: number;
 }
 
 const NewRequests: React.FC = () => {
@@ -20,9 +35,12 @@ const NewRequests: React.FC = () => {
   const [toSiteId, setToSiteId] = useState<string>("");
 
   const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
-  const [selectedEquipment, setSelectedEquipment] = useState<string>("");
-  const [quantity, setQuantity] = useState<number>(1);
-  const [maxQuantity, setMaxQuantity] = useState<number>(1);
+  
+  // --- MODIFIED: State for handling multiple items ---
+  const [transferItems, setTransferItems] = useState<TransferRow[]>([
+    { localId: Date.now(), equipmentId: "", quantity: 1, maxQuantity: 1 }
+  ]);
+
   const [vehicleNumber, setVehicleNumber] = useState<string>("");
   const [remarks, setRemarks] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -104,27 +122,54 @@ const NewRequests: React.FC = () => {
     fetchEquipment();
   }, [fromSiteId]);
 
-  // Update quantity limit
-  useEffect(() => {
-    if (!selectedEquipment) {
-      setMaxQuantity(1);
-      setQuantity(1);
-      return;
-    }
+  // --- NEW: Add / Remove / Update Row Logic ---
 
-    const s = equipmentList.find((eq) => eq.id.toString() === selectedEquipment);
-    if (s) {
-      setMaxQuantity(s.total);
-      if (quantity > s.total) setQuantity(s.total);
-    }
-  }, [selectedEquipment, equipmentList]);
+  const handleAddRow = () => {
+    setTransferItems([
+      ...transferItems,
+      { localId: Date.now(), equipmentId: "", quantity: 1, maxQuantity: 1 }
+    ]);
+  };
+
+  const handleRemoveRow = (localId: number) => {
+    if (transferItems.length === 1) return; // Prevent deleting the last row
+    setTransferItems(transferItems.filter(item => item.localId !== localId));
+  };
+
+  const updateRow = (localId: number, field: keyof TransferRow, value: any) => {
+    setTransferItems(items => items.map(item => {
+      if (item.localId !== localId) return item;
+
+      // If we are changing the equipment, we need to update maxQuantity automatically
+      if (field === 'equipmentId') {
+        const selectedEq = equipmentList.find(e => e.id.toString() === value);
+        return {
+          ...item,
+          equipmentId: value,
+          maxQuantity: selectedEq ? selectedEq.total : 1,
+          quantity: 1 // reset quantity when equipment changes
+        };
+      }
+
+      // Standard update for quantity
+      return { ...item, [field]: value };
+    }));
+  };
 
   // Submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!fromSiteId || !user?.id || !selectedEquipment || !toSiteId) {
+    // Validation
+    if (!fromSiteId || !user?.id || !toSiteId) {
       alert("Missing required fields.");
+      return;
+    }
+    
+    // Check if any row is missing equipment
+    const invalidRow = transferItems.find(item => !item.equipmentId);
+    if (invalidRow) {
+      alert("Please select equipment for all rows.");
       return;
     }
 
@@ -135,38 +180,36 @@ const NewRequests: React.FC = () => {
 
     setLoading(true);
 
-let image_url: string | null = null;
-if (imageFile) {
-  try {
-    image_url = await uploadImageToSupabase(imageFile);
-  } catch (err) {
-    console.error(err);
-    alert("Image upload failed.");
-  }
-}
+    let image_url: string | null = null;
+    if (imageFile) {
+      try {
+        image_url = await uploadImageToSupabase(imageFile);
+      } catch (err) {
+        console.error(err);
+        alert("Image upload failed.");
+      }
+    }
 
-    const { error } = await supabase.from("equipment_transfers").insert([
-      {
-        equipment_id: Number(selectedEquipment),
-        from_site_id: fromSiteId,
-        to_site_id: toSiteId,
-        requested_by: user.id,
-        status: "pending",
-        quantity,
-        vehicle_number: vehicleNumber,
-        remarks,
-        image_url,
-      },
-    ]);
+    // --- MODIFIED: Create Payload for Batch Insert ---
+    const payload = transferItems.map(item => ({
+      equipment_id: Number(item.equipmentId),
+      from_site_id: fromSiteId,
+      to_site_id: toSiteId,
+      requested_by: user.id,
+      status: "pending",
+      quantity: item.quantity,
+      vehicle_number: vehicleNumber,
+      remarks,
+      image_url,
+    }));
+
+    const { error } = await supabase.from("equipment_transfers").insert(payload);
 
     setLoading(false);
 
     if (error) {
       console.error(error);
       alert("Failed to create request. Try refreshing");
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
     } else {
       alert("Transfer submitted successfully.");
       navigate("/dashboard");
@@ -210,24 +253,77 @@ if (imageFile) {
           </select>
         </div>
 
-        {/* Equipment */}
+        {/* --- MODIFIED: Dynamic Equipment List --- */}
         <div>
-          <label className="block text-sm mb-1">Equipment</label>
-          <select
-            value={selectedEquipment}
-            onChange={(e) => setSelectedEquipment(e.target.value)}
-            className="w-full border rounded p-2"
-            required
+          <label className="block text-sm mb-1 font-medium text-gray-700">Equipment List</label>
+          <div className="space-y-3">
+            {transferItems.map((item, index) => (
+              <div key={item.localId} className="relative bg-gray-50 p-3 rounded-lg border border-gray-200">
+                
+                {/* Mobile Responsive Flex Container */}
+                <div className="flex gap-2 items-start">
+                  
+                  {/* Select: flex-1 allows it to take remaining width */}
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs text-gray-500 mb-1 block">Item Name</label>
+                    <select
+                      value={item.equipmentId}
+                      onChange={(e) => updateRow(item.localId, 'equipmentId', e.target.value)}
+                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    >
+                      <option value="">Select equipment</option>
+                      {equipmentList
+                        .filter((eq) => eq.total > 0)
+                        .map((eq) => (
+                          <option key={eq.id} value={eq.id}>
+                            {eq.name} (Max: {eq.total})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* Quantity: Fixed width + flex-shrink-0 prevents squishing */}
+                  <div className="w-20 flex-shrink-0">
+                    <label className="text-xs text-gray-500 mb-1 block">Qty</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={item.maxQuantity}
+                      value={item.quantity}
+                      onChange={(e) =>
+                        updateRow(item.localId, 'quantity', Math.min(Number(e.target.value), item.maxQuantity))
+                      }
+                      className="w-full border border-gray-300 rounded p-2 text-sm text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Remove Button (Only show if more than 1 item) */}
+                {transferItems.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveRow(item.localId)}
+                    className="absolute -top-2 -right-2 bg-white text-red-500 p-1 rounded-full shadow border border-gray-200 hover:bg-red-50"
+                    title="Remove item"
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add Button */}
+          <button
+            type="button"
+            onClick={handleAddRow}
+            className="mt-3 w-full py-2 flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors text-sm font-medium"
           >
-            <option value="">Select equipment</option>
-            {equipmentList
-              .filter((eq) => eq.total > 0)
-              .map((eq) => (
-                <option key={eq.id} value={eq.id}>
-                  {eq.name} (Available: {eq.total})
-                </option>
-              ))}
-          </select>
+            <PlusIcon />
+            Add Another Equipment
+          </button>
         </div>
 
         {/* Vehicle Number */}
@@ -238,22 +334,6 @@ if (imageFile) {
             value={vehicleNumber}
             onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
             maxLength={13}
-            className="w-full border rounded p-2"
-            required
-          />
-        </div>
-
-        {/* Quantity */}
-        <div>
-          <label className="block text-sm mb-1">Quantity (Max: {maxQuantity})</label>
-          <input
-            type="number"
-            min={1}
-            max={maxQuantity}
-            value={quantity}
-            onChange={(e) =>
-              setQuantity(Math.min(Number(e.target.value), maxQuantity))
-            }
             className="w-full border rounded p-2"
             required
           />
@@ -304,9 +384,9 @@ if (imageFile) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+          className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold shadow-sm"
         >
-          {loading ? "Submitting..." : "Transfer"}
+          {loading ? "Submitting..." : `Transfer ${transferItems.length} Item${transferItems.length > 1 ? 's' : ''}`}
         </button>
       </form>
     </div>
