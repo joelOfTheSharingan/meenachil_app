@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase.ts";
+import { supabase,meenachil } from "../lib/supabase.ts";
 import { useAuth } from "../contexts/AuthContext.tsx";
 
 interface TransactionLog {
@@ -33,7 +33,7 @@ export default function TransactionLogs() {
 
       setLoading(true);
 
-      let query = supabase
+      let query = meenachil
         .from("equipment_transfers")
         .select(`
           id,
@@ -51,7 +51,7 @@ export default function TransactionLogs() {
 
       // Supervisor filter
       if (user.role === "supervisor") {
-        const { data: userSites, error: sitesError } = await supabase
+        const { data: userSites, error: sitesError } = await meenachil
           .from("construction_sites")
           .select("id")
           .eq("supervisor_id", user.id);

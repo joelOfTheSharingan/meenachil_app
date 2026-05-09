@@ -8,7 +8,7 @@ const supabaseAnonKey =
 export const STORAGE_BUCKET = "Transfer-Images";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
+export const meenachil=supabase.schema("meenachil")
 /**
  * Upload an image to Supabase Storage
  */

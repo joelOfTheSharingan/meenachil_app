@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase.ts";
+import { supabase,meenachil } from "../lib/supabase.ts";
 import { useAuth } from "../contexts/AuthContext.tsx";
 import { useNavigate } from "react-router-dom";
 
@@ -48,7 +48,7 @@ const SendRequest: React.FC = () => {
 
   // Fetch user sites
   const fetchUserSites = async (userId: string) => {
-    const { data: sitesData, error } = await supabase
+    const { data: sitesData, error } = await meenachil
       .from("construction_sites")
       .select("id, site_name")
       .eq("supervisor_id", userId);
@@ -61,7 +61,7 @@ const SendRequest: React.FC = () => {
 
   // Fetch all equipment
   const fetchAllEquipment = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await meenachil
       .from("equipment")
       .select(`
         id,
@@ -184,7 +184,7 @@ const SendRequest: React.FC = () => {
         };
       });
 
-      const { error } = await supabase.from("equipment_requests").insert(payload);
+      const { error } = await meenachil.from("equipment_requests").insert(payload);
 
       if (error) {
         console.error("Error creating request:", error);

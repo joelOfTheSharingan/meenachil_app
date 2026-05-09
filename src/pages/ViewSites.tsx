@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase.ts";
+import { supabase ,meenachil} from "../lib/supabase.ts";
 import { EquipmentTransfer } from "../lib/supabase.ts";
 
 const ViewSites: React.FC = () => {
@@ -26,7 +26,7 @@ const ViewSites: React.FC = () => {
       setUserSiteId(userData.site_id);
 
       // Fetch equipment
-      const { data: equipmentData } = await supabase
+      const { data: equipmentData } = await meenachil
         .from("equipment")
         .select("id, name, isRental, quantity")
         .eq("site_id", userData.site_id);
@@ -47,7 +47,7 @@ const ViewSites: React.FC = () => {
       }
 
       // Incoming requests
-      const { data: inReq } = await supabase
+      const { data: inReq } = await meenachil
         .from("equipment_transfers")
         .select(
           `id, equipment_id, quantity, status, requested_at, 
@@ -58,7 +58,7 @@ const ViewSites: React.FC = () => {
       setIncomingRequests(inReq ?? []);
 
       // Outgoing requests
-      const { data: outReq } = await supabase
+      const { data: outReq } = await meenachil
         .from("equipment_transfers")
         .select(
           `id, equipment_id, quantity, status, requested_at, 

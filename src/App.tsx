@@ -2,12 +2,11 @@ import React from 'react'
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext.tsx'
 import { ProtectedRoute } from './components/ProtectedRoute.tsx'
-import { LoginPage } from './pages/LoginPage.tsx'
+import  LoginPage  from './pages/LoginPage.tsx'
 import SignUpPage from './pages/SignUpPage.tsx'
 import HomePage from './pages/HomePage.tsx'
 import AdminDashboard from './pages/AdminDashboard.tsx'
 import SupervisorDashboard from './pages/SupervisorDashboard.tsx'
-import MySiteTools from './pages/MySiteTools.tsx'
 import AllInventoryPage from './pages/AllInventory.tsx'
 import NewRequestsPage from './pages/NewRequests.tsx'   
 import UserManagement from './pages/Users.tsx'
@@ -86,14 +85,7 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/my-site-tools"
-        element={
-          <ProtectedRoute allowedRoles={['supervisor']}>
-            <MySiteTools />
-          </ProtectedRoute>
-        }
-      />
+      
       <Route
         path="/inventory"
         element={

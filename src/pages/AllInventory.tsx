@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase.ts";
+import { supabase ,meenachil} from "../lib/supabase.ts";
 import { Button } from "../components/ui/button.tsx";
 import { useNavigate } from "react-router-dom";
 import { Mail, Edit2, Save, X, Loader2 } from "lucide-react";
@@ -34,13 +34,13 @@ const AllInventory: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: eqData, error: eqError } = await supabase
+      const { data: eqData, error: eqError } = await meenachil
         .from("equipment")
         .select("id, name, site_id, quantity, isRental, construction_sites(site_name, id)");
 
       if (eqError) throw new Error(eqError.message);
 
-      const { data: sitesData, error: sitesError } = await supabase
+      const { data: sitesData, error: sitesError } = await meenachil
         .from("construction_sites")
         .select("id, site_name");
 
@@ -170,7 +170,7 @@ const AllInventory: React.FC = () => {
     try {
         // Batch update using a promise for each required change (or use RLS for bulk RPC if performance is key)
         const updatePromises = updates.map(update => 
-            supabase.from('equipment').update({ quantity: update.quantity }).eq('id', update.id)
+            meenachil.from('equipment').update({ quantity: update.quantity }).eq('id', update.id)
         );
 
         const results = await Promise.all(updatePromises);

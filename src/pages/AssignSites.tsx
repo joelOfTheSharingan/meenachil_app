@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase.ts";
+import { supabase ,meenachil} from "../lib/supabase.ts";
 
 interface Site {
   id: string;
@@ -35,7 +35,7 @@ export default function AssignSites() {
   // Fetch all construction sites (with assigned supervisors)
   const fetchSites = async () => {
     console.log("🔄 Fetching sites...");
-    const { data, error } = await supabase
+    const { data, error } = await meenachil
       .from("construction_sites")
       .select("id, site_name, supervisor_id");
 
@@ -54,7 +54,7 @@ const handleDeleteSite = async (siteId: string) => {
   const siteLabel = site ? site.site_name : "this site";
 
   // 1️⃣ Check if any equipment is linked to this site
-  const { data: equipment, error: equipError } = await supabase
+  const { data: equipment, error: equipError } = await meenachil
     .from("equipment")
     .select("id")
     .eq("site_id", siteId);
@@ -77,7 +77,7 @@ const handleDeleteSite = async (siteId: string) => {
 
   setDeletingId(siteId);
   try {
-    const { error } = await supabase
+    const { error } = await meenachil
       .from("construction_sites")
       .delete()
       .eq("id", siteId);
@@ -178,7 +178,7 @@ const handleDeleteSite = async (siteId: string) => {
 
     setLoading(true);
 
-    const { error } = await supabase
+    const { error } = await meenachil
       .from("construction_sites")
       .update({ supervisor_id: selectedSupervisor })
       .eq("id", selectedSite);
@@ -204,7 +204,7 @@ const handleDeleteSite = async (siteId: string) => {
     setCreating(true);
     try {
       const selectedSup = supervisors.find(s => s.id === newContractorSupervisorId);
-      const { data, error } = await supabase
+      const { data, error } = await meenachil
         .from("construction_sites")
         .insert({ 
           site_name: newSiteName.trim(), 

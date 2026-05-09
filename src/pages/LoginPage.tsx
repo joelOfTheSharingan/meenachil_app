@@ -1,51 +1,67 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext.tsx'
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext.tsx";
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const { signIn, signInWithGoogle, user, loading: authLoading } = useAuth()
-  const navigate = useNavigate()
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  const { signIn, signInWithGoogle, user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+
+  /**
+   * LOGIN
+   */
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-    const { error } = await signIn(email, password)
-    setLoading(false)
+    const res = await signIn(email, password);
 
-    if (error) {
-      setError(error.message)
+    setLoading(false);
+
+    if (res.error) {
+      setError(res.error);
+      return;
     }
-  }
 
+    /**
+     * DO NOT navigate here
+     * AuthContext will update `user`
+     */
+  };
+
+  /**
+   * GOOGLE LOGIN
+   */
   const handleGoogleLogin = async () => {
     try {
-      setError('')
-      await signInWithGoogle()
-      // Redirect happens automatically after OAuth
+      setError("");
+      await signInWithGoogle();
     } catch (err: any) {
-      setError(err.message || 'Google sign-in failed')
+      setError(err.message || "Google sign-in failed");
     }
-  }
+  };
 
-  // Redirect user based on role
+  /**
+   * REDIRECT AFTER AUTH IS READY
+   */
   useEffect(() => {
-    if (!authLoading && user) {
-      if (user.role === 'admin') {
-        navigate('/admin')
-      } else if (user.role === 'supervisor') {
-        navigate('/home')
-      } else {
-        navigate('/unauthorized')
-      }
+    if (authLoading) return;
+    if (!user) return;
+
+    if (user.role === "admin") {
+      navigate("/admin", { replace: true });
+    } else if (user.role === "supervisor") {
+      navigate("/home", { replace: true });
+    } else {
+      navigate("/unauthorized", { replace: true });
     }
-  }, [user, authLoading, navigate])
+  }, [user, authLoading, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
@@ -62,53 +78,43 @@ const LoginPage: React.FC = () => {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-4 py-2 border rounded-md"
             required
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className="w-full px-4 py-2 border rounded-md"
             required
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
 
           <button
-            type="submit"
             disabled={loading || authLoading}
-            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition duration-200 disabled:opacity-50"
+            className="w-full bg-blue-600 text-white py-2 rounded-md"
           >
-            {loading || authLoading ? 'Signing in...' : 'Sign in'}
+            {loading || authLoading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <div className="mt-6">
-          <button
-            onClick={handleGoogleLogin}
-            disabled={authLoading}
-            className="w-full border border-gray-300 py-2 rounded-md flex items-center justify-center hover:bg-gray-100 transition duration-200 disabled:opacity-50"
-          >
-            <img
-              src="https://www.svgrepo.com/show/355037/google.svg"
-              alt="Google"
-              className="w-5 h-5 mr-2"
-            />
-            Continue with Google
-          </button>
-        </div>
+        <button
+          onClick={handleGoogleLogin}
+          className="w-full border mt-6 py-2 rounded-md"
+        >
+          Continue with Google
+        </button>
 
         <button
-          type="button"
-          onClick={() => navigate('/signup')}
-          className="text-blue-600 hover:text-blue-500 w-full mt-4 text-center"
+          onClick={() => navigate("/signup")}
+          className="text-blue-600 w-full mt-4"
         >
           Don’t have an account? Sign up
         </button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default LoginPage
-export { LoginPage }
+export default LoginPage;

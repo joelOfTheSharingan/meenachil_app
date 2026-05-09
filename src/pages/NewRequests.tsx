@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase, uploadImageToSupabase } from "../lib/supabase.ts";
+import { supabase, uploadImageToSupabase,meenachil } from "../lib/supabase.ts";
 import { useAuth } from "../contexts/AuthContext.tsx";
 import { useNavigate } from "react-router-dom";
 
@@ -51,7 +51,7 @@ const NewRequests: React.FC = () => {
     const fetchSupervisorSites = async () => {
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { data, error } = await meenachil
         .from("construction_sites")
         .select("id, site_name")
         .eq("supervisor_id", user.id);
@@ -70,7 +70,7 @@ const NewRequests: React.FC = () => {
   // Fetch all sites
   useEffect(() => {
     const fetchSites = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await meenachil
         .from("construction_sites")
         .select("id, site_name");
 
@@ -86,7 +86,7 @@ const NewRequests: React.FC = () => {
     if (!fromSiteId) return;
 
     const fetchEquipment = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await meenachil
         .from("equipment")
         .select("id, name, quantity, isRental")
         .eq("site_id", fromSiteId);
@@ -203,7 +203,7 @@ const NewRequests: React.FC = () => {
       image_url,
     }));
 
-    const { error } = await supabase.from("equipment_transfers").insert(payload);
+    const { error } = await meenachil.from("equipment_transfers").insert(payload);
 
     setLoading(false);
 

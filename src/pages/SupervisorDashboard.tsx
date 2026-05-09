@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase.ts";
+import { supabase,meenachil } from "../lib/supabase.ts";
 import { useNavigate, Link } from "react-router-dom";
 import { EquipmentTransfer, EquipmentRequest } from "../lib/supabase.ts";
 
@@ -35,7 +35,7 @@ const Dashboard: React.FC = () => {
   // Refresh incoming requests (to selected site)
   const refreshRequests = async (siteId: string) => {
     try {
-      const { data: requestsData, error } = await supabase
+      const { data: requestsData, error } = await meenachil
         .from("equipment_transfers")
         .select(`
           id,
@@ -71,7 +71,7 @@ const Dashboard: React.FC = () => {
   // Refresh outgoing requests (from selected site)
   const refreshOutgoingRequests = async (siteId: string) => {
     try {
-      const { data: outgoingData, error } = await supabase
+      const { data: outgoingData, error } = await meenachil
         .from("equipment_transfers")
         .select(`
           id,
@@ -108,7 +108,7 @@ const Dashboard: React.FC = () => {
   // Refresh equipment requests sent to admin (created by this supervisor for selected site)
   const refreshOutgoingAdminRequests = async (siteId: string, supervisorId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await meenachil
         .from("equipment_requests")
         .select(`
           id,
@@ -154,7 +154,7 @@ const Dashboard: React.FC = () => {
 
   // Refresh equipment for selected site
   const refreshEquipment = async (siteId: string) => {
-    const { data: equipmentData, error: eqError } = await supabase
+    const { data: equipmentData, error: eqError } = await meenachil
       .from("equipment")
       .select("id, name, status, isRental, quantity")
       .eq("site_id", siteId);
@@ -183,7 +183,7 @@ const Dashboard: React.FC = () => {
   // Fetch all sites associated with the user
   const fetchUserSites = async (userId: string) => {
     try {
-      const { data: sitesData, error } = await supabase
+      const { data: sitesData, error } = await meenachil
         .from("construction_sites")
         .select("id, site_name")
         .eq("supervisor_id", userId);
@@ -225,14 +225,14 @@ const Dashboard: React.FC = () => {
 
       setUserEmail(user.email || null);
 
-      // Try fetching user row by auth_id first
+      // Try fetching user row by id first
       let { data: userRow, error: userDbError } = await supabase
         .from("users")
         .select("id")
-        .eq("auth_id", user.id)
+        .eq("id", user.id)
         .maybeSingle();
 
-      // Fallback: fetch by id if auth_id is missing
+      // Fallback: fetch by id if id is missing
       if (!userRow) {
         ({ data: userRow, error: userDbError } = await supabase
           .from("users")
@@ -298,7 +298,7 @@ const Dashboard: React.FC = () => {
 
   try {
     // Update the transfer status first
-    const { error: transferError } = await supabase
+    const { error: transferError } = await meenachil
       .from("equipment_transfers")
       .update({
         status: accept ? "approved" : "rejected",
@@ -321,7 +321,7 @@ const Dashboard: React.FC = () => {
     // ✅ FIXED: Proper equipment transfer logic for ACCEPTED requests
     
     // 1. Get the source equipment details
-    const { data: fromEquipment, error: fromError } = await supabase
+    const { data: fromEquipment, error: fromError } = await meenachil
       .from("equipment")
       .select("*")
       .eq("id", req.equipment_id)
@@ -334,7 +334,7 @@ const Dashboard: React.FC = () => {
     }
 
     // 2. Update source site equipment (reduce quantity)
-    const { error: updateSourceError } = await supabase
+    const { error: updateSourceError } = await meenachil
       .from("equipment")
       .update({ 
         quantity: fromEquipment.quantity - req.quantity 
@@ -348,7 +348,7 @@ const Dashboard: React.FC = () => {
     }
 
     // 3. Find existing equipment at destination site with same name
-    const { data: existingDestEquipment, error: destQueryError } = await supabase
+    const { data: existingDestEquipment, error: destQueryError } = await meenachil
       .from("equipment")
       .select("*")
       .eq("site_id", req.to_site_id)
@@ -361,7 +361,7 @@ const Dashboard: React.FC = () => {
 
     if (existingDestEquipment) {
       // 4a. Update existing equipment at destination
-      const { error: updateDestError } = await supabase
+      const { error: updateDestError } = await meenachil
         .from("equipment")
         .update({ 
           quantity: existingDestEquipment.quantity + req.quantity 
@@ -375,7 +375,7 @@ const Dashboard: React.FC = () => {
       }
     } else {
       // 4b. Create new equipment record at destination
-      const { error: insertDestError } = await supabase
+      const { error: insertDestError } = await meenachil
         .from("equipment")
         .insert({
           name: fromEquipment.name,
@@ -409,7 +409,7 @@ const Dashboard: React.FC = () => {
 };
   const handleCancelTransfer = async (req: EquipmentTransfer) => {
     try {
-      const { error: cancelError } = await supabase
+      const { error: cancelError } = await meenachil
         .from("equipment_transfers")
         .update({ status: "cancelled" })
         .eq("id", req.id);
@@ -434,7 +434,7 @@ const Dashboard: React.FC = () => {
       const ok = window.confirm("Are you sure you want to cancel this request?");
       if (!ok) return;
 
-      const { error } = await supabase
+      const { error } = await meenachil
         .from("equipment_requests")
         .delete()
         .eq("id", reqId)

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase.ts";
+import { supabase ,meenachil} from "../lib/supabase.ts";
 import { useNavigate } from "react-router-dom";
 import { EquipmentRequest } from "../lib/supabase.ts";
 
@@ -122,7 +122,7 @@ const EquipmentRequests: React.FC = () => {
   // Fetch all equipment requests with related data
   const fetchRequests = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await meenachil
         .from("equipment_requests")
         .select(`
           *,
@@ -168,7 +168,7 @@ const EquipmentRequests: React.FC = () => {
 
   const handleEditSave = async (requestId: string, updates: Partial<RequestWithDetails>) => {
     try {
-      const { error } = await supabase
+      const { error } = await meenachil
         .from("equipment_requests")
         .update({
           equipment_name: updates.equipment_name,
@@ -198,7 +198,7 @@ const EquipmentRequests: React.FC = () => {
 
     try {
       // Update request status
-      const { error: updateError } = await supabase
+      const { error: updateError } = await meenachil
         .from("equipment_requests")
         .update({ status: "approved" })
         .eq("id", request.id);
@@ -218,7 +218,7 @@ const EquipmentRequests: React.FC = () => {
         }
 
         // Check if equipment already exists at this site
-        const { data: existingEquipment, error: checkError } = await supabase
+        const { data: existingEquipment, error: checkError } = await meenachil
           .from("equipment")
           .select("id, quantity")
           .eq("site_id", request.site_id)
@@ -233,7 +233,7 @@ const EquipmentRequests: React.FC = () => {
 
         if (existingEquipment) {
           // Update existing equipment quantity
-          const { error: updateQuantityError } = await supabase
+          const { error: updateQuantityError } = await meenachil
             .from("equipment")
             .update({ quantity: existingEquipment.quantity + request.quantity })
             .eq("id", existingEquipment.id);
@@ -244,7 +244,7 @@ const EquipmentRequests: React.FC = () => {
           }
         } else {
           // Insert new equipment
-          const { error: insertError } = await supabase
+          const { error: insertError } = await meenachil
             .from("equipment")
             .insert({
               name: equipmentName,
@@ -267,7 +267,7 @@ const EquipmentRequests: React.FC = () => {
           return;
         }
 
-        const { data: currentEquipment, error: fetchError } = await supabase
+        const { data: currentEquipment, error: fetchError } = await meenachil
           .from("equipment")
           .select("quantity")
           .eq("id", request.equipment_id)
@@ -282,7 +282,7 @@ const EquipmentRequests: React.FC = () => {
 
         if (newQuantity <= 0) {
           // Delete the equipment row
-          const { error: deleteError } = await supabase
+          const { error: deleteError } = await meenachil
             .from("equipment")
             .delete()
             .eq("id", request.equipment_id);
@@ -293,7 +293,7 @@ const EquipmentRequests: React.FC = () => {
           }
         } else {
           // Update quantity
-          const { error: updateQuantityError } = await supabase
+          const { error: updateQuantityError } = await meenachil
             .from("equipment")
             .update({ quantity: newQuantity })
             .eq("id", request.equipment_id);
@@ -319,7 +319,7 @@ const EquipmentRequests: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase
+      const { error } = await meenachil
         .from("equipment_requests")
         .update({ status: "rejected" })
         .eq("id", request.id);
