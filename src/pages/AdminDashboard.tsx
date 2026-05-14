@@ -315,14 +315,15 @@ export default function AdminDashboard() {
     loadDashboardData();
   }, [loadDashboardData]);
 
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) console.error("Logout failed:", error.message);
-    } finally {
-      navigate("/login");
-    }
-  };
+  const handleLogout = () => {
+  const isLocal = window.location.hostname === "localhost";
+
+  const url = isLocal
+    ? "http://localhost:3000/home/"
+    : "https://joelofthesharingan.github.io/home/";
+
+  window.location.href = url;
+};
 
   const filteredRequests = pendingRequests.filter(
     (req) => selectedSite === "all" || req.site_name === selectedSite
@@ -351,7 +352,7 @@ export default function AdminDashboard() {
               onClick={handleLogout}
               className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium transition duration-300"
             >
-              Log Out
+              Back to home
             </button>
           </div>
 

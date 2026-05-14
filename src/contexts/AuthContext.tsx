@@ -41,11 +41,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const authDone = useRef(false);
+  const hydrated = useRef(false);
 
-  /**
-   * PROFILE FETCH (NON-BLOCKING)
-   */
   const fetchProfile = async (authUser: User) => {
     try {
       const { data } = await supabase
@@ -70,9 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         username: data.username,
         phone: data.phone,
       });
-    } catch (err) {
-      console.error("Profile error:", err);
-
+    } catch {
       setUser({
         id: authUser.id,
         email: authUser.email || "",
@@ -81,64 +76,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  /**
-   * INIT AUTH (CRITICAL FIX)
-   */
   useEffect(() => {
     let mounted = true;
 
     const init = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        setLoading(true);
 
+        const { data } = await supabase.auth.getSession();
         if (!mounted) return;
+
+        const session = data.session;
 
         setSession(session);
 
         if (session?.user) {
-          fetchProfile(session.user); // 🔥 DO NOT AWAIT
+          fetchProfile(session.user); // IMPORTANT: don't await
         } else {
           setUser(null);
         }
-      } catch (err) {
-        console.error(err);
-        setUser(null);
+
+        hydrated.current = true;
       } finally {
-        if (mounted) {
-          setLoading(false); // 🔥 ALWAYS STOP SPINNER
-          authDone.current = true;
-        }
+        if (mounted) setLoading(false);
       }
     };
 
     init();
 
-    /**
-     * AUTH LISTENER (NO LOADING CONTROL HERE)
-     */
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
 
-      if (session?.user) {
-        fetchProfile(session.user);
-      } else {
-        setUser(null);
+        if (session?.user) {
+          fetchProfile(session.user);
+        } else {
+          setUser(null);
+        }
+
+        if (hydrated.current) setLoading(false);
       }
-    });
+    );
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      listener.subscription.unsubscribe();
     };
   }, []);
 
-  /**
-   * AUTH FUNCTIONS
-   */
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -158,9 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const signInWithGoogle = async () => {
-    const redirectTo = window.location.hostname.includes("github.io")
-      ? "https://joelofthesharingan.github.io/meenachil_app/"
-      : window.location.origin;
+    const redirectTo = window.location.origin;
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -177,13 +160,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const refreshProfile = async () => {
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (authUser) {
-      await fetchProfile(authUser);
-    }
+    const { data } = await supabase.auth.getUser();
+    if (data.user) await fetchProfile(data.user);
   };
 
   return (
@@ -205,15 +183,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
-/**
- * HOOK
- */
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
-  }
-
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  return ctx;
 };

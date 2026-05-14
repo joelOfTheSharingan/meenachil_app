@@ -274,14 +274,15 @@ const Dashboard: React.FC = () => {
   fetchUserAndEquipment();
 }, []);
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate("/login");
-    } catch (error: any) {
-      console.error("Error logging out:", error.message);
-    }
-  };
+  const handleLogout = () => {
+  const isLocal = window.location.hostname === "localhost";
+
+  const url = isLocal
+    ? "http://localhost:3000/home/"
+    : "https://joelofthesharingan.github.io/home/";
+
+  window.location.href = url;
+};
 
   const handleDecision = async (req: EquipmentTransfer, accept: boolean) => {
   if (!req.equipment_id || !req.to_site_id || !req.from_site_id) {
@@ -594,7 +595,7 @@ const Dashboard: React.FC = () => {
                 onClick={handleLogout}
                 className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium"
               >
-                Log Out
+               Back to home
               </button>
             </div>
           </div>
