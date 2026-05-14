@@ -316,14 +316,14 @@ export default function AdminDashboard() {
   }, [loadDashboardData]);
 
   const handleLogout = () => {
-  const isLocal = window.location.hostname === "localhost";
+    const isLocal = window.location.hostname === "localhost";
 
-  const url = isLocal
-    ? "http://localhost:3000/home/"
-    : "https://joelofthesharingan.github.io/home/";
+    const url = isLocal
+      ? "http://localhost:3000/home/"
+      : "https://joelofthesharingan.github.io/home/";
 
-  window.location.href = url;
-};
+    window.location.href = url;
+  };
 
   const filteredRequests = pendingRequests.filter(
     (req) => selectedSite === "all" || req.site_name === selectedSite

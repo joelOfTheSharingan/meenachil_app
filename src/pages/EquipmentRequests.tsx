@@ -179,14 +179,16 @@ const EquipmentRequests: React.FC = () => {
     fetchRequests();
   }, [fetchRequests]);
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate("/login");
-    } catch (error: any) {
-      console.error("Error logging out:", error.message);
-    }
+  const handleLogout = () => {
+    const isLocal = window.location.hostname === "localhost";
+
+    const url = isLocal
+      ? "http://localhost:3000/home/"
+      : "https://joelofthesharingan.github.io/home/";
+
+    window.location.href = url;
   };
+
 
   const handleEditSave = async (requestId: string, updates: Partial<RequestWithDetails>) => {
     try {
