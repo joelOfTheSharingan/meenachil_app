@@ -418,7 +418,7 @@ const EquipmentRequests: React.FC = () => {
               onClick={handleLogout}
               className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium"
             >
-              Log Out
+              Back to home
             </button>
           </div>
 
